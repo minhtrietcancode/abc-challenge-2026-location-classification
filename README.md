@@ -1,4 +1,4 @@
-markdown# ABC 2026 Challenge - Activity & Location Recognition
+# ABC 2026 Challenge - Activity & Location Recognition
 
 This year's challenge contains 2 problems:
 - **Location Prediction**: Predict location based on labeled RSSI (Received Signal Strength Indicator) values from Bluetooth beacon signals
