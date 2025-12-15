@@ -16,11 +16,17 @@ ABC2026/
 ├── data_prep/                        # Data cleaning notebooks
 │   ├── label_data_cleaning.ipynb     # Label dataset preprocessing
 │   ├── ble_data_merging.ipynb        # Merge all BLE CSV files
-│   └── ble_data_cleaning.ipynb       # BLE data preprocessing
+│   ├── ble_data_cleaning.ipynb       # BLE data preprocessing
+│   └── add_label_ble_data.ipynb      # Timestamp-based labeling of BLE data
 ├── cleaned_dataset/                  # Processed data outputs
 │   ├── cleaned_label_loc.csv         # Cleaned location labels
 │   ├── merged_ble_data.csv           # All BLE data merged into one file
-│   └── cleaned_ble_data.csv          # Final cleaned BLE dataset
+│   ├── cleaned_ble_data.csv          # Final cleaned BLE dataset
+│   └── labelled_ble_data.csv         # BLE data with room labels
+├── analysis/                         # Exploratory data analysis
+│   ├── basic_analysis.ipynb          # Analysis of individual label and BLE files
+│   └── labelled_ble_data_analysis.ipynb  # Analysis of labeled BLE dataset
+├── .gitignore                        # Git ignore rules for large files
 └── README.md                         # This file
 ```
 
@@ -133,7 +139,7 @@ Two Jupyter notebooks provided by the challenge organizers:
 
 ## Data Cleaning (data_prep/)
 
-The data preparation process consists of three main steps:
+The data preparation process consists of four main steps:
 
 ### 1. Label Data Cleaning (`label_data_cleaning.ipynb`)
 
@@ -197,6 +203,83 @@ Starting with the merged BLE data (~5 million records), we performed extensive c
 - Beacon 19: 133,965 readings
 - (... and 21 other beacons with varying frequencies)
 
+### 4. BLE Data Labeling (`add_label_ble_data.ipynb`)
+
+After cleaning both the location labels and BLE sensor data, we merged them to create a labeled dataset for supervised learning.
+
+#### Objective
+Match each BLE sensor reading with its corresponding room label based on timestamp alignment.
+
+#### Approach
+We perform a **timestamp-based join** between the BLE sensor data and location labels:
+
+1. **Merge Strategy**: Use `pd.merge_asof()` with `direction='backward'` to find the most recent label where `started_at <= BLE_timestamp`
+2. **Validation**: Ensure `BLE_timestamp <= finished_at` to guarantee the timestamp falls within the labeled time range
+3. **Filtering**: Keep only records with valid room labels (drop unlabeled data)
+
+#### Why Drop Unlabeled Records?
+
+**Decision: Drop 34% of BLE data without matching labels**
+
+**Rationale**:
+- **Supervised Learning Requirement**: We need labeled data to train a room classification model
+- **Data Collection Design**: 
+  - User 90 (caregiver) continuously collected BLE sensor data
+  - User 97 (labeler) selectively annotated specific location visits
+  - This creates gaps where sensor data exists but no ground truth label is available
+- **Unlabeled records represent**:
+  - Transition periods between rooms
+  - Times when the labeler wasn't actively tracking
+  - Areas outside the scope of this challenge
+- **Not a preprocessing error**: The 34% gap is inherent to the dataset design, not a mistake in our code
+
+#### Data Cleaning Steps
+1. ✅ Convert timestamps to datetime format
+2. ✅ Match BLE readings with room labels using time ranges
+3. ✅ Validate timestamp falls within [started_at, finished_at]
+4. ✅ Drop records without valid labels
+5. ✅ Remove unnecessary columns (power, started_at, finished_at)
+
+#### Result
+- **Original BLE records**: ~1.67M
+- **Labeled records retained**: ~1.10M (66%)
+- **Records dropped**: ~0.57M (34%)
+
+**Output file**: `cleaned_dataset/labelled_ble_data.csv` with columns:
+- `timestamp`: Detection time
+- `mac address`: Beacon ID (1-25)
+- `RSSI`: Signal strength in dBm
+- `room`: **[TARGET LABEL]** Room/location name
+
+**File format**:
+```csv
+timestamp,mac address,RSSI,room
+2023-04-10 14:21:46+09:00,6,-93,kitchen
+```
+
+---
+
+## Exploratory Data Analysis (analysis/)
+
+After preparing the cleaned and labeled datasets, we conducted exploratory analysis to understand the data characteristics.
+
+### 1. Basic Analysis (`basic_analysis.ipynb`)
+
+Initial exploration of individual data files:
+- Examined structure and format of raw label data
+- Analyzed distribution of BLE sensor readings
+- Investigated temporal patterns in data collection
+- Explored beacon signal characteristics
+
+### 2. Labeled BLE Data Analysis (`labelled_ble_data_analysis.ipynb`)
+
+Comprehensive analysis of the merged labeled dataset:
+- Room distribution and class balance
+- Beacon signal patterns across different locations
+- RSSI value distributions per room
+- Temporal patterns and visit durations
+- Feature engineering insights for model development
+
 ---
 
 ## Task Overview
@@ -204,9 +287,9 @@ Starting with the merged BLE data (~5 million records), we performed extensive c
 **Objective**: Build a machine learning model that predicts which room a person is in based on RSSI signal patterns from multiple beacons.
 
 **Training approach**:
-1. Merge cleaned BLE data with location labels based on timestamps
-2. For each BLE reading, find the corresponding room label where started_at <= BLE_timestamp <= finished_at
-3. Aggregate and structure RSSI values from different beacons as features
+1. Use the labeled BLE dataset (`labelled_ble_data.csv`) which already has room labels matched to each sensor reading
+2. Aggregate and structure RSSI values from different beacons as features
+3. Engineer time-based and signal-strength features
 4. Train a classification model to predict room labels from RSSI patterns
 
 **Key challenge**: Different beacons are detected at different locations with varying signal strengths. The model must learn which combination of beacon signals corresponds to each room.
@@ -220,4 +303,7 @@ Starting with the merged BLE data (~5 million records), we performed extensive c
 - Labels may only begin at 2:21 PM (14:21)
 - Only use BLE data files whose timestamps overlap with the labeled time ranges
 
-This has been addressed in the data cleaning process by filtering the BLE data to match the labeled time range (2023-04-10 13:00:00 to 2023-04-13 17:29:59).
+This has been addressed in the data cleaning process by:
+1. Filtering the BLE data to match the labeled time range (2023-04-10 13:00:00 to 2023-04-13 17:29:59)
+2. Performing timestamp-based matching to align BLE readings with room labels
+3. Dropping 34% of BLE readings that fall outside labeled time ranges (expected behavior given the data collection design)
