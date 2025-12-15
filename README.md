@@ -6,6 +6,26 @@ This year's challenge contains 2 problems:
 
 ---
 
+## Repository Structure
+```
+ABC2026/
+├── Dataset/                          # Original raw data
+│   ├── BLE Data/                     # Raw BLE sensor CSV files
+│   ├── 5f_label_loc_train.csv        # Location labels
+│   └── 5th floor map.png             # Facility floor plan
+├── data_prep/                        # Data cleaning notebooks
+│   ├── label_data_cleaning.ipynb     # Label dataset preprocessing
+│   ├── ble_data_merging.ipynb        # Merge all BLE CSV files
+│   └── ble_data_cleaning.ipynb       # BLE data preprocessing
+├── cleaned_dataset/                  # Processed data outputs
+│   ├── cleaned_label_loc.csv         # Cleaned location labels
+│   ├── merged_ble_data.csv           # All BLE data merged into one file
+│   └── cleaned_ble_data.csv          # Final cleaned BLE dataset
+└── README.md                         # This file
+```
+
+---
+
 ## Location Prediction Problem
 
 ### Context
@@ -111,12 +131,80 @@ Two Jupyter notebooks provided by the challenge organizers:
 
 ---
 
+## Data Cleaning (data_prep/)
+
+The data preparation process consists of three main steps:
+
+### 1. Label Data Cleaning (`label_data_cleaning.ipynb`)
+
+Starting with the raw label file `5f_label_loc_train.csv` (1,334 records), we performed the following cleaning operations:
+
+**Filtering steps**:
+- Removed unnecessary index columns (`Unnamed: 0.1`, `Unnamed: 0`)
+- Filtered for records where `activity == "Location"` (location labeling tasks only)
+- Removed records with null values in `started_at` or `finished_at` columns
+- Excluded records marked as deleted (`deleted_at` is not null)
+- Filtered for `user_id == 97` (5th floor location labeling only)
+- Dropped unused columns: `deleted_at`, `updated_at`, `activity`, `user`, `user_id`
+
+**Result**: 451 clean location label records saved to `cleaned_dataset/cleaned_label_loc.csv` with columns:
+- `started_at`: Entry timestamp for the location
+- `finished_at`: Exit timestamp for the location  
+- `room`: Target label (location name)
+- `floor`: Floor identifier
+
+### 2. BLE Data Merging (`ble_data_merging.ipynb`)
+
+The raw BLE data is split across multiple CSV files in `Dataset/BLE Data/`. These were merged into a single file:
+
+**Process**:
+- Read all `userbleid_90_*.csv` files from the BLE Data directory
+- Concatenated all records maintaining the original schema
+- Saved as `cleaned_dataset/merged_ble_data.csv`
+
+**Result**: ~5 million BLE signal records in a single file
+
+### 3. BLE Data Cleaning (`ble_data_cleaning.ipynb`)
+
+Starting with the merged BLE data (~5 million records), we performed extensive cleaning:
+
+**Temporal filtering**:
+- Converted `timestamp` column to proper datetime format (with timezone UTC+09:00)
+- Filtered for records between 2023-04-10 13:00:00 and 2023-04-13 17:29:59
+  - We did this step as instructed in the provided tutorial notebook on how to process ble data as no documentations are provided
+  - Day 1 (1 PM onwards) through Day 4 (until 5:30 PM)
+
+**Beacon filtering**:
+- From hundreds of unique MAC addresses detected, selected only 25 key beacons
+- These 25 beacons correspond to the main BLE transmitters installed on the 5th floor
+- Mapped MAC addresses to beacon IDs (1-25) for easier reference
+
+**Column cleanup**:
+- Removed `Unnamed: 0` (accidentally saved index column)
+- Removed `user_id` column (all records are from user 90)
+- Removed `name` column (always null)
+
+**Result**: 1,673,395 cleaned BLE records saved to `cleaned_dataset/cleaned_ble_data.csv` with columns:
+- `timestamp`: Detection time (timezone-aware datetime)
+- `mac address`: Beacon ID (1-25)
+- `RSSI`: Signal strength in dBm
+- `power`: Additional signal information (typically -2147483648)
+
+**Beacon distribution** (number of readings per beacon):
+- Beacon 4: 380,092 readings
+- Beacon 9: 330,508 readings  
+- Beacon 14: 186,595 readings
+- Beacon 19: 133,965 readings
+- (... and 21 other beacons with varying frequencies)
+
+---
+
 ## Task Overview
 
 **Objective**: Build a machine learning model that predicts which room a person is in based on RSSI signal patterns from multiple beacons.
 
 **Training approach**:
-1. Merge BLE data with location labels based on timestamps
+1. Merge cleaned BLE data with location labels based on timestamps
 2. For each BLE reading, find the corresponding room label where started_at <= BLE_timestamp <= finished_at
 3. Aggregate and structure RSSI values from different beacons as features
 4. Train a classification model to predict room labels from RSSI patterns
@@ -131,3 +219,5 @@ Two Jupyter notebooks provided by the challenge organizers:
 - BLE data may be collected starting at 10:22 AM
 - Labels may only begin at 2:21 PM (14:21)
 - Only use BLE data files whose timestamps overlap with the labeled time ranges
+
+This has been addressed in the data cleaning process by filtering the BLE data to match the labeled time range (2023-04-10 13:00:00 to 2023-04-13 17:29:59).
