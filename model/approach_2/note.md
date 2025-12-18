@@ -1,0 +1,1 @@
+this is an approach which utilize the lord trick which in order to handle the class imbalance, we penalty the model 3x more times for the minority classes compared to the majority classes 
