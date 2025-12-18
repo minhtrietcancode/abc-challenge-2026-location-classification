@@ -1,0 +1,1 @@
+this approach use approach 1's core idea, however it will add a step of handling class imbalance of minority class by using a SMOTE technique 
