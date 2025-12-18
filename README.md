@@ -17,15 +17,26 @@ ABC2026/
 │   ├── label_data_cleaning.ipynb     # Label dataset preprocessing
 │   ├── ble_data_merging.ipynb        # Merge all BLE CSV files
 │   ├── ble_data_cleaning.ipynb       # BLE data preprocessing
-│   └── add_label_ble_data.ipynb      # Timestamp-based labeling of BLE data
+│   ├── add_label_ble_data.ipynb      # Timestamp-based labeling of BLE data
+│   └── split_data.ipynb              # Split data for model selection and validation
 ├── cleaned_dataset/                  # Processed data outputs
 │   ├── cleaned_label_loc.csv         # Cleaned location labels
 │   ├── merged_ble_data.csv           # All BLE data merged into one file
 │   ├── cleaned_ble_data.csv          # Final cleaned BLE dataset
-│   └── labelled_ble_data.csv         # BLE data with room labels
+│   ├── labelled_ble_data.csv         # BLE data with room labels
+│   └── split_data/                   # Train/test splits for modeling
+│       ├── model_selection/          # Day 1+2 train / Day 3 val
+│       │   ├── train.csv
+│       │   └── val.csv
+│       └── model_validation/         # Day 1+2+3 train / Day 4 test
+│           ├── train.csv
+│           └── test.csv
 ├── analysis/                         # Exploratory data analysis
 │   ├── basic_analysis.ipynb          # Analysis of individual label and BLE files
 │   └── labelled_ble_data_analysis.ipynb  # Analysis of labeled BLE dataset
+├── model/                            # Model development
+│   └── xgboost_1st_version/          # First baseline model
+│       └── pipeline.ipynb            # Complete training and evaluation pipeline
 ├── .gitignore                        # Git ignore rules for large files
 └── README.md                         # This file
 ```
@@ -139,7 +150,7 @@ Two Jupyter notebooks provided by the challenge organizers:
 
 ## Data Cleaning (data_prep/)
 
-The data preparation process consists of four main steps:
+The data preparation process consists of five main steps:
 
 ### 1. Label Data Cleaning (`label_data_cleaning.ipynb`)
 
@@ -257,6 +268,48 @@ timestamp,mac address,RSSI,room
 2023-04-10 14:21:46+09:00,6,-93,kitchen
 ```
 
+### 5. Data Splitting (`split_data.ipynb`)
+
+After creating the labeled BLE dataset, we split it into train/validation/test sets using a **time-based strategy** to prevent data leakage.
+
+#### Rationale for Time-Based Splitting
+
+**Why not random splitting?**
+- BLE records are highly autocorrelated - consecutive readings within the same second are nearly identical
+- Random splitting would put similar samples in both train and test sets
+- This would artificially inflate performance metrics and not reflect real-world generalization
+
+**Solution: Split by day**
+- Day 1 (2023-04-10): ~600K records
+- Day 2 (2023-04-11): ~330K records
+- Day 3 (2023-04-12): ~145K records
+- Day 4 (2023-04-13): ~28K records
+
+#### Split Configurations
+
+**1. Model Selection Split** (`cleaned_dataset/split_data/model_selection/`)
+- **Train**: Day 1 + Day 2 (~930K records)
+- **Validation**: Day 3 (~145K records)
+- **Purpose**: For hyperparameter tuning and initial model selection
+- **Note**: May have unseen classes in validation set due to class imbalance
+
+**2. Model Validation Split** (`cleaned_dataset/split_data/model_validation/`)
+- **Train**: Day 1 + Day 2 + Day 3 (~1.07M records)
+- **Test**: Day 4 (~28K records)
+- **Purpose**: Final model validation before competition submission
+- **Advantage**: More training data reduces unseen class issues
+
+#### Output Files
+```
+cleaned_dataset/split_data/
+├── model_selection/
+│   ├── train.csv          # Day 1+2 for training
+│   └── val.csv            # Day 3 for validation
+└── model_validation/
+    ├── train.csv          # Day 1+2+3 for training
+    └── test.csv           # Day 4 for testing
+```
+
 ---
 
 ## Exploratory Data Analysis (analysis/)
@@ -282,17 +335,104 @@ Comprehensive analysis of the merged labeled dataset:
 
 ---
 
+## Model Development (model/)
+
+### XGBoost Baseline Model (`xgboost_1st_version/`)
+
+Our first baseline model uses XGBoost for multiclass room classification with a window-based aggregation approach.
+
+#### Approach Overview
+
+**Pipeline**: `pipeline.ipynb`
+
+1. **Temporal Aggregation (Windowing)**
+   - Aggregate raw BLE records into 1-second time windows
+   - Reduces noise and creates stable feature representations
+   - Handles asynchronous beacon detection patterns
+
+2. **Feature Engineering**
+   - For each 1-second window and each of 25 beacons, compute:
+     - **Mean RSSI**: Average signal strength (proximity indicator)
+     - **Standard Deviation**: Signal stability indicator
+     - **Count**: Number of detections (visibility indicator)
+   - Total features: 25 beacons × 3 statistics = **75 features per window**
+   - Missing beacons (not detected in window) are filled with zeros
+
+3. **Class Imbalance Handling**
+   - Apply sample weights equivalent to `class_weight='balanced'`
+   - Ensures rare rooms are weighted equally to common rooms
+   - Critical for optimizing Macro F1 score (competition metric)
+
+4. **Model Training**
+   - **Algorithm**: XGBoost multiclass classifier
+   - **Training data**: Day 1 + Day 2 from `model_selection/train.csv`
+   - **Test data**: Day 3 from `model_selection/test.csv`
+   - **Evaluation metric**: Macro F1 score (equal weight per class)
+
+5. **Prediction Strategy**
+   - Predict at window level (one prediction per second)
+   - Propagate window predictions to all frames within that window
+   - Generates frame-level predictions for submission
+
+#### Handling Unseen Classes
+
+**Challenge**: Some rooms appear in test set but not in training set due to temporal splitting and class imbalance.
+
+**Solution**:
+- Identify unseen classes before evaluation
+- Filter test set to include only classes seen during training
+- Mark unseen class samples as 'UNKNOWN_CLASS' in predictions
+- Report metrics separately for seen vs unseen classes
+
+#### Evaluation Approach
+
+**Two-level evaluation**:
+1. **Window-level**: Evaluate aggregated 1-second predictions
+2. **Frame-level**: Evaluate original BLE record predictions (true competition metric)
+
+**Outputs**:
+- Classification report with per-class F1 scores
+- Confusion matrix heatmap showing misclassification patterns
+- Macro F1 score (primary competition metric)
+- Frame-level predictions CSV for submission
+
+#### Key Results
+
+The pipeline generates:
+- `xgboost_model.pkl`: Trained model
+- `label_encoder.pkl`: Label encoding mapping
+- `model_evaluation_results.txt`: Window-level metrics
+- `frame_level_evaluation_results.txt`: Frame-level metrics
+- `test_predictions.csv`: Frame-level predictions for all test records
+- `confusion_matrix_frame_level.png`: Visualization of misclassifications
+- `confusion_matrix_percentage_frame_level.png`: Percentage confusion matrix
+
+#### Future Improvements
+
+Potential optimizations for next iterations:
+- Test different window sizes (2s, 3s, 5s)
+- Add additional features (max RSSI, dominant beacon, zone aggregations)
+- Hyperparameter tuning with GridSearchCV
+- Temporal smoothing of predictions
+- Ensemble methods combining multiple models
+- Try LightGBM or CatBoost as alternatives
+
+---
+
 ## Task Overview
 
 **Objective**: Build a machine learning model that predicts which room a person is in based on RSSI signal patterns from multiple beacons.
 
 **Training approach**:
 1. Use the labeled BLE dataset (`labelled_ble_data.csv`) which already has room labels matched to each sensor reading
-2. Aggregate and structure RSSI values from different beacons as features
-3. Engineer time-based and signal-strength features
-4. Train a classification model to predict room labels from RSSI patterns
+2. Split data temporally by day to prevent data leakage
+3. Aggregate raw readings into time windows for stable features
+4. Engineer beacon-level statistical features (mean, std, count)
+5. Train XGBoost classifier with class balancing for Macro F1 optimization
+6. Evaluate at both window and frame levels
+7. Generate frame-level predictions for competition submission
 
-**Key challenge**: Different beacons are detected at different locations with varying signal strengths. The model must learn which combination of beacon signals corresponds to each room.
+**Key challenge**: Different beacons are detected at different locations with varying signal strengths. The model must learn which combination of beacon signals corresponds to each room while handling class imbalance and unseen classes.
 
 ---
 
@@ -307,3 +447,8 @@ This has been addressed in the data cleaning process by:
 1. Filtering the BLE data to match the labeled time range (2023-04-10 13:00:00 to 2023-04-13 17:29:59)
 2. Performing timestamp-based matching to align BLE readings with room labels
 3. Dropping 34% of BLE readings that fall outside labeled time ranges (expected behavior given the data collection design)
+
+**Class Imbalance**: Some rooms appear very rarely in the dataset, and temporal splitting may result in unseen classes in validation/test sets. This is handled by:
+1. Using sample weights equivalent to `class_weight='balanced'`
+2. Filtering test set to evaluate only on seen classes
+3. Marking unseen class predictions separately
