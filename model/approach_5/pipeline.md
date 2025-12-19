@@ -237,14 +237,22 @@ Example:
 
 ### 5.1 Apply Time-Based Windowing
 **Window specification:**
-- Window size: 45 seconds
-- Overlap: 0 seconds (non-overlapping)
+- **Window size: 1-2 seconds** (specific to your dataset)
+  - Paper used 45 seconds, but your data requires shorter windows
+  - Start with 1 second, can increase to 2 seconds if needed
+  - Choose based on data density and sampling rate
+- **Overlap: 0 seconds** (non-overlapping)
 - Apply to augmented training data
 
+**Important note about window size:**
+- Different datasets have different optimal window sizes
+- Paper's facility: 45 seconds worked due to slower movement patterns
+- Your competition data: 1-2 seconds is more appropriate
+- Window size depends on beacon detection frequency and data characteristics
+
 **Process:**
-1. Sort data by timestamp
-2. Group consecutive records within each 45-second window
-3. Each window becomes one sample for the model
+1. Group consecutive records within each 1-2 second window
+2. Each window becomes one sample for the model
 
 ### 5.2 Extract Statistical Features for Each Beacon
 For each of the 25 beacons, calculate these 5 statistics per window:
@@ -256,7 +264,7 @@ For each of the 25 beacons, calculate these 5 statistics per window:
 
 **Result:** 25 beacons × 5 features = **125 features per window**
 
-### 5.3 Extract Temporal Features
+### 5.3 Extract Temporal Features (Try later, we will start with 125 features above first)
 From the timestamp, extract:
 1. **Hour:** Hour of day (0-23)
 2. **Minute:** Minute of hour (0-59)
@@ -264,7 +272,7 @@ From the timestamp, extract:
 
 **Result:** **3 temporal features**
 
-### 5.4 Create Final Feature Matrix
+### 5.4 Create Final Feature Matrix (Try later, we will start with 125 features above first)
 **Total features per window:** 125 (statistical) + 3 (temporal) = **128 features**
 
 **Final training data structure:**
@@ -287,7 +295,7 @@ From the timestamp, extract:
 - Proven effective in indoor localization
 
 **Training:**
-- Input: Feature matrix (128 features)
+- Input: Feature matrix (128 features) (Try later, we will start with 125 features above first)
 - Output: Room location labels
 - Use augmented training data from Step 5
 
@@ -295,27 +303,39 @@ From the timestamp, extract:
 **Test data preparation:**
 1. Apply same preprocessing as training data:
    - Pivot to beacon matrix
-   - Apply 45-second windowing
+   - Apply windowing (1-2 seconds)
    - Extract same 128 features
 2. **Do NOT apply any augmentation to test data**
 
+**Prediction and Label Assignment:**
+1. For each window in test data, model predicts a room location
+2. **Assign the predicted window label to ALL records within that window**
+   - Example: If a 2-second window (from 10:22:55 to 10:22:57) is predicted as Room 508
+   - Then ALL frame-level records within that 2-second window get assigned location = 508
+3. This converts window-level predictions back to frame-level predictions
+
 **Evaluation metrics:**
-1. **Overall Weighted F1-Score:** Accounts for class imbalance
+1. **Macro F1-Score:** PRIMARY metric for competition ranking (equal weight to all classes)
 2. **Per-Class F1-Score:** Especially for minority classes (Room 508, 516)
 3. **Precision:** How accurate predictions are
 4. **Recall:** How many actual samples were found
+
+**Why Macro F1-Score:**
+- Competition uses macro F1 for ranking
+- Treats all classes equally (unlike weighted F1 which favors majority classes)
+- Better metric for imbalanced datasets when all classes matter equally
 
 ### 6.3 Compare with Baseline
 **Baseline:** Model trained on original data (no augmentation)
 
 **Comparison points:**
 1. Minority class F1-score improvement
-2. Overall weighted F1-score improvement
+2. **Overall Macro F1-score improvement** (competition metric)
 3. Whether minority classes can now be detected (0% → >0%)
 
-**Expected results (from paper):**
+**Expected results (adapted from paper):**
 - Target class F1-score improvement: 27% to 40%
-- Overall weighted F1-score improvement: 6% to 8%
+- Overall macro F1-score improvement: expected similar gains
 - Minority classes (Room 508, 516) become detectable
 
 ---
@@ -326,8 +346,8 @@ From the timestamp, extract:
 2. **Define Layout** → Map 6 surrounding beacons for each room
 3. **Find Matches** → Calculate KL divergence, select best matched rooms
 4. **Relabel** → Sample from matched majority, relabel to minority, concatenate
-5. **Feature Engineering** → Window data, extract 128 features
-6. **Train & Evaluate** → Random Forest on augmented data, compare with baseline
+5. **Feature Engineering** → Window data (1-2 seconds), extract 128 features
+6. **Train & Evaluate** → Random Forest on augmented data, predict on test windows, propagate labels to frames, evaluate with macro F1-score
 
 ---
 
@@ -346,6 +366,10 @@ From the timestamp, extract:
 
 5. **Relabeling scope:** Only relabel the location column. Keep all RSSI values unchanged.
 
-6. **Window size:** 45 seconds non-overlapping (from paper's methodology)
+6. **Window size:** 1-2 seconds non-overlapping (dataset specific - paper used 45s)
 
 7. **Feature count:** 25 beacons × 5 statistics + 3 temporal = 128 features total
+
+8. **Competition metric:** Macro F1-score (equal weight for all classes)
+
+9. **Label propagation:** After prediction on test windows, assign predicted label to ALL frame-level records within each window
