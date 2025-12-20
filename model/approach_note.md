@@ -16,4 +16,5 @@
 ### Approach 4: more features introduced - top beacons features and some related things 
 - we try to use this idea applied to improve approach 1, which is the starting pipeline but this still does not work. We can now conclude that the problem is with 2 things: class imbalance which destroy our macro f1 score and the misunderstading of classification between adjacent rooms (we need some way to filter noise in data to handle this problem)
 
-### Approach 5: 
+### Approach 5: use the relabelling method that be introduced in the MDPI paper
+- we use the relabel method in the mdpi to: find matching (KL Divergence) + relabel + add to initial training data -> train a random forest classifier 
