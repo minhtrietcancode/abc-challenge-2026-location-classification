@@ -374,16 +374,6 @@ Our first baseline model uses XGBoost for multiclass room classification with a 
    - Propagate window predictions to all frames within that window
    - Generates frame-level predictions for submission
 
-#### Handling Unseen Classes
-
-**Challenge**: Some rooms appear in test set but not in training set due to temporal splitting and class imbalance.
-
-**Solution**:
-- Identify unseen classes before evaluation
-- Filter test set to include only classes seen during training
-- Mark unseen class samples as 'UNKNOWN_CLASS' in predictions
-- Report metrics separately for seen vs unseen classes
-
 #### Evaluation Approach
 
 **Two-level evaluation**:
