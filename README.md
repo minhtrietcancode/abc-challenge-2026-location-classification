@@ -35,8 +35,13 @@ ABC2026/
 │   ├── basic_analysis.ipynb          # Analysis of individual label and BLE files
 │   └── labelled_ble_data_analysis.ipynb  # Analysis of labeled BLE dataset
 ├── model/                            # Model development
-│   └── xgboost_1st_version/          # First baseline model
-│       └── pipeline.ipynb            # Complete training and evaluation pipeline
+│   ├── approach_note.md              # Documentation of all modeling approaches
+│   ├── approach_1/                   # First modeling approach
+│   ├── approach_2/                   # Second modeling approach
+│   ├── approach_3/                   # Third modeling approach
+│   ├── approach_4/                   # Fourth modeling approach
+│   ├── approach_5/                   # Fifth modeling approach
+│   └── approach_6/                   # Sixth modeling approach
 ├── .gitignore                        # Git ignore rules for large files
 └── README.md                         # This file
 ```
@@ -337,75 +342,13 @@ Comprehensive analysis of the merged labeled dataset:
 
 ## Model Development (model/)
 
-### XGBoost Baseline Model (`xgboost_1st_version/`)
+All modeling approaches and experimental details are documented in `model/approach_note.md`. This includes:
+- Feature engineering strategies
+- Model architectures and hyperparameters
+- Evaluation metrics and results
+- Lessons learned and future improvements
 
-Our first baseline model uses XGBoost for multiclass room classification with a window-based aggregation approach.
-
-#### Approach Overview
-
-**Pipeline**: `pipeline.ipynb`
-
-1. **Temporal Aggregation (Windowing)**
-   - Aggregate raw BLE records into 1-second time windows
-   - Reduces noise and creates stable feature representations
-   - Handles asynchronous beacon detection patterns
-
-2. **Feature Engineering**
-   - For each 1-second window and each of 25 beacons, compute:
-     - **Mean RSSI**: Average signal strength (proximity indicator)
-     - **Standard Deviation**: Signal stability indicator
-     - **Count**: Number of detections (visibility indicator)
-   - Total features: 25 beacons × 3 statistics = **75 features per window**
-   - Missing beacons (not detected in window) are filled with zeros
-
-3. **Class Imbalance Handling**
-   - Apply sample weights equivalent to `class_weight='balanced'`
-   - Ensures rare rooms are weighted equally to common rooms
-   - Critical for optimizing Macro F1 score (competition metric)
-
-4. **Model Training**
-   - **Algorithm**: XGBoost multiclass classifier
-   - **Training data**: Day 1 + Day 2 from `model_selection/train.csv`
-   - **Test data**: Day 3 from `model_selection/test.csv`
-   - **Evaluation metric**: Macro F1 score (equal weight per class)
-
-5. **Prediction Strategy**
-   - Predict at window level (one prediction per second)
-   - Propagate window predictions to all frames within that window
-   - Generates frame-level predictions for submission
-
-#### Evaluation Approach
-
-**Two-level evaluation**:
-1. **Window-level**: Evaluate aggregated 1-second predictions
-2. **Frame-level**: Evaluate original BLE record predictions (true competition metric)
-
-**Outputs**:
-- Classification report with per-class F1 scores
-- Confusion matrix heatmap showing misclassification patterns
-- Macro F1 score (primary competition metric)
-- Frame-level predictions CSV for submission
-
-#### Key Results
-
-The pipeline generates:
-- `xgboost_model.pkl`: Trained model
-- `label_encoder.pkl`: Label encoding mapping
-- `model_evaluation_results.txt`: Window-level metrics
-- `frame_level_evaluation_results.txt`: Frame-level metrics
-- `test_predictions.csv`: Frame-level predictions for all test records
-- `confusion_matrix_frame_level.png`: Visualization of misclassifications
-- `confusion_matrix_percentage_frame_level.png`: Percentage confusion matrix
-
-#### Future Improvements
-
-Potential optimizations for next iterations:
-- Test different window sizes (2s, 3s, 5s)
-- Add additional features (max RSSI, dominant beacon, zone aggregations)
-- Hyperparameter tuning with GridSearchCV
-- Temporal smoothing of predictions
-- Ensemble methods combining multiple models
-- Try LightGBM or CatBoost as alternatives
+Each approach is organized in its own subdirectory (`approach_1/` through `approach_6/`) containing the relevant notebooks, scripts, and outputs.
 
 ---
 
@@ -416,11 +359,9 @@ Potential optimizations for next iterations:
 **Training approach**:
 1. Use the labeled BLE dataset (`labelled_ble_data.csv`) which already has room labels matched to each sensor reading
 2. Split data temporally by day to prevent data leakage
-3. Aggregate raw readings into time windows for stable features
-4. Engineer beacon-level statistical features (mean, std, count)
-5. Train XGBoost classifier with class balancing for Macro F1 optimization
-6. Evaluate at both window and frame levels
-7. Generate frame-level predictions for competition submission
+3. Apply feature engineering and modeling techniques (see `model/approach_note.md` for details)
+4. Evaluate using Macro F1 score (competition metric)
+5. Generate frame-level predictions for competition submission
 
 **Key challenge**: Different beacons are detected at different locations with varying signal strengths. The model must learn which combination of beacon signals corresponds to each room while handling class imbalance and unseen classes.
 
@@ -438,7 +379,4 @@ This has been addressed in the data cleaning process by:
 2. Performing timestamp-based matching to align BLE readings with room labels
 3. Dropping 34% of BLE readings that fall outside labeled time ranges (expected behavior given the data collection design)
 
-**Class Imbalance**: Some rooms appear very rarely in the dataset, and temporal splitting may result in unseen classes in validation/test sets. This is handled by:
-1. Using sample weights equivalent to `class_weight='balanced'`
-2. Filtering test set to evaluate only on seen classes
-3. Marking unseen class predictions separately
+**Class Imbalance**: Some rooms appear very rarely in the dataset, and temporal splitting may result in unseen classes in validation/test sets. This is handled through various techniques documented in `model/approach_note.md`.
