@@ -1,20 +1,11 @@
-### Data Splitting
-- Day 1 + 2 for training 
-- Day 3 for testing
+Overall of what we have done so far 
+- We start with this pipeline: create a 25 - features vector: beacon_1, beacon_2, ..., beacon_25 with the value for that feature be equal to RSSI of that records if mac address match with the "i" of beacon_i --> then we apply windowing (window size = 1 second) by grouping by timestamp (timestamp is up to second) with these aggregated features: mean, std, count --> then we regard each window as a record which would be feed into the XGBoost Classifier model --> and then we also apply the same data processing steps with the test data --> classify on the windowed test data and then propagate back to the frame-level data 
+--> initially we got an macro f1 score of 0.28: the majority classes have f1 score of around 0.5 - 0.6, however the minority class and the hallway (which is always be misclassified as some other rooms - easy to understand as it is hard to distinguish between which is the room and the hallway, as the hallway span through outside all of the rooms) destroy the macro f1 with their score of around 0.00 - 0.05 
 
-### Approach 1: Starting pipeline
-- Window size = 1
-- 25 beacons x 3 features (mean, std, count)
-- Gradient Boosting Algorithm: XGBoost
-
-### Approach 2: Funny trick applied on approach 1
-- just penalty XGBoost more for minority class / increase the weight of minority class 3x times, however obviously this lord trick cannot be used, it just means pay attention 3x times to shjt ...
-
-### Approach 3: SMOTE applied to handle class imbalance compared to approach 1
-- we try to use SMOTE technique to handle class imbalance here, however this still does not make any big difference
-
-### Approach 4: more features introduced - top beacons features and some related things 
-- we try to use this idea applied to improve approach 1, which is the starting pipeline but this still does not work. We can now conclude that the problem is with 2 things: class imbalance which destroy our macro f1 score and the misunderstading of classification between adjacent rooms (we need some way to filter noise in data to handle this problem)
-
-### Approach 5: use the relabelling method that be introduced in the MDPI paper
-- we use the relabel method in the mdpi to: find matching (KL Divergence) + relabel + add to initial training data -> train a random forest classifier 
+And then i have tried some more optimization 
+- Add more aggregated features: instead of just mean, std, count, we also add min and max --> the result is slightly better of around 0.3 - 0.31 (i have verified on both set of train/test sets so all of the result here are all legit and valuable) 
+- A lord / funny trick: when i train the xgboost model, i give the weight for the minority classes 3x times compared to the majority classes -> but obviously this did not change anything, doing like that is just like paying attention 3x times to shjt haha 
+- Using SMOTE / Oversampling to handle the class imbalance --> however this does not help change anything --> as i predict these techniques did not solve or handle the root of this problem which is the shjt of this type of data which is not stable and have too many noise / shjt inside itself
+- Try to introduce some more aggregated features when windowing: dominated_features --> however despite sounds to make some change -> it did not make anything significant -> we could try to think about it later in the future, however the current result has shown that the current way we use this idea did not make any change 
+- Next trial is the most expected techniques: the relabelling techniques that be introduced in the paper that the organization guide pariticipants to read as reference before attending this competition. However this method did not help anything, as the metrics in the paper is weighted f1 score, i think that the reason why their method work is because with that technique, they just give more power - bias for the majority classes -> which therefore even further boost their weighted f1 score. However in this context, the metric is macro f1 score - which cannot be gaslighted by that dump method 
+- The next approach i try is 2 stage classification: so the idea is that instead of this too-many-class-classification, we would breakdown the problem into smaller problems: classify the zone first (3 zones: left, middle, right side of the 5th floor) -> and then perform in-zone classification for rooms later --> I used to expect so much with this approach, however it did not work as expected, the result stay the same. However, some details note is that, when we just require the model to learn and predict in some smaller number of zone (zone left, right, middle here), the result is much better than the macro f1 score of the big problem here (0.3), the result for 3 zone classification when we just require model to learn and predict in that zone only are: 0.51, 0.44, 0.32 and the accuracy of zone classification is 0.86 
