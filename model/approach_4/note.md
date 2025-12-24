@@ -1,1 +1,0 @@
-this model will introduce a new feature engineered called: dominant beacon, no SMOTE applied here, compared to approachb 1 we just introduce new features
