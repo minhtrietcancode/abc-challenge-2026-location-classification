@@ -1,0 +1,14 @@
+4-DAY DATA ANALYSIS SUMMARY
+======================================================================
+
+PERFORMANCE COMPARISON:
+  Model Selection (Days 1+2 -> Day 3): F1 = 0.400 +/- 0.069
+  Model Validation (Days 1+2+3 -> Day 4): F1 = 0.584 +/- 0.053
+
+KEY FINDINGS:
+  Day 3 has 3 new rooms not in training
+  Day 4 has 1 new rooms not in training
+  Day 3 mean sequence length: 67.1
+  Day 4 mean sequence length: 48.4
+  Day 3 transition rate: 1.47%
+  Day 4 transition rate: 2.03%
