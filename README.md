@@ -18,22 +18,26 @@ ABC2026/
 │   ├── ble_data_merging.ipynb        # Merge all BLE CSV files
 │   ├── ble_data_cleaning.ipynb       # BLE data preprocessing
 │   ├── add_label_ble_data.ipynb      # Timestamp-based labeling of BLE data
-│   └── split_data.ipynb              # Split data for model selection and validation
+│   └── split_data.py                 # Split data for 4-fold cross-validation
 ├── cleaned_dataset/                  # Processed data outputs
 │   ├── cleaned_label_loc.csv         # Cleaned location labels
 │   ├── merged_ble_data.csv           # All BLE data merged into one file
 │   ├── cleaned_ble_data.csv          # Final cleaned BLE dataset
 │   ├── labelled_ble_data.csv         # BLE data with room labels
-│   └── split_data/                   # Train/test splits for modeling
-│       ├── model_selection/          # Day 1+2 train / Day 3 val
+│   └── split_data/                   # 4-fold cross-validation splits
+│       ├── fold1/                    # Fold 1: Test on Day 1, Train on Days 2+3+4
 │       │   ├── train.csv
-│       │   └── val.csv
-│       └── model_validation/         # Day 1+2+3 train / Day 4 test
+│       │   └── test.csv
+│       ├── fold2/                    # Fold 2: Test on Day 2, Train on Days 1+3+4
+│       │   ├── train.csv
+│       │   └── test.csv
+│       ├── fold3/                    # Fold 3: Test on Day 3, Train on Days 1+2+4
+│       │   ├── train.csv
+│       │   └── test.csv
+│       └── fold4/                    # Fold 4: Test on Day 4, Train on Days 1+2+3
 │           ├── train.csv
 │           └── test.csv
-├── analysis/                         # Exploratory data analysis
-│   ├── basic_analysis.ipynb          # Analysis of individual label and BLE files
-│   └── labelled_ble_data_analysis.ipynb  # Analysis of labeled BLE dataset
+├── analysis/                         # working space to examine data characteristics
 ├── model/                            # Model development
 │   ├── approach_note.md              # Documentation of all modeling approaches
 │   ├── approach_1/                   # First modeling approach
@@ -41,7 +45,9 @@ ABC2026/
 │   ├── approach_3/                   # Third modeling approach
 │   ├── approach_4/                   # Fourth modeling approach
 │   ├── approach_5/                   # Fifth modeling approach
-│   └── approach_6/                   # Sixth modeling approach
+│   ├── approach_6/                   # Sixth modeling approach
+│   ├── approach_7/                   # Seventh modeling approach
+│   └── approach_8/                   # Eighth modeling approach (LSTM)
 ├── .gitignore                        # Git ignore rules for large files
 └── README.md                         # This file
 ```
@@ -273,9 +279,9 @@ timestamp,mac address,RSSI,room
 2023-04-10 14:21:46+09:00,6,-93,kitchen
 ```
 
-### 5. Data Splitting (`split_data.ipynb`)
+### 5. Data Splitting (`split_data.py`)
 
-After creating the labeled BLE dataset, we split it into train/validation/test sets using a **time-based strategy** to prevent data leakage.
+After creating the labeled BLE dataset, we split it into **4-fold cross-validation** sets using a **time-based strategy** to prevent data leakage.
 
 #### Rationale for Time-Based Splitting
 
@@ -284,33 +290,50 @@ After creating the labeled BLE dataset, we split it into train/validation/test s
 - Random splitting would put similar samples in both train and test sets
 - This would artificially inflate performance metrics and not reflect real-world generalization
 
-**Solution: Split by day**
+**Solution: Split by day with 4-fold cross-validation**
 - Day 1 (2023-04-10): ~600K records
 - Day 2 (2023-04-11): ~330K records
 - Day 3 (2023-04-12): ~145K records
 - Day 4 (2023-04-13): ~28K records
 
-#### Split Configurations
+#### 4-Fold Cross-Validation Configuration
 
-**1. Model Selection Split** (`cleaned_dataset/split_data/model_selection/`)
-- **Train**: Day 1 + Day 2 (~930K records)
-- **Validation**: Day 3 (~145K records)
-- **Purpose**: For hyperparameter tuning and initial model selection
-- **Note**: May have unseen classes in validation set due to class imbalance
+Each fold uses one day as the test set and the remaining three days as the training set:
 
-**2. Model Validation Split** (`cleaned_dataset/split_data/model_validation/`)
-- **Train**: Day 1 + Day 2 + Day 3 (~1.07M records)
+**Fold 1** (`cleaned_dataset/split_data/fold1/`)
+- **Test**: Day 1 (~600K records)
+- **Train**: Day 2 + Day 3 + Day 4 (~503K records)
+
+**Fold 2** (`cleaned_dataset/split_data/fold2/`)
+- **Test**: Day 2 (~330K records)
+- **Train**: Day 1 + Day 3 + Day 4 (~773K records)
+
+**Fold 3** (`cleaned_dataset/split_data/fold3/`)
+- **Test**: Day 3 (~145K records)
+- **Train**: Day 1 + Day 2 + Day 4 (~958K records)
+
+**Fold 4** (`cleaned_dataset/split_data/fold4/`)
 - **Test**: Day 4 (~28K records)
-- **Purpose**: Final model validation before competition submission
-- **Advantage**: More training data reduces unseen class issues
+- **Train**: Day 1 + Day 2 + Day 3 (~1.07M records)
+
+#### Purpose
+- **Robust evaluation**: Average performance across 4 folds provides more reliable estimates
+- **Temporal generalization**: Tests model's ability to generalize to different days
+- **Class imbalance handling**: Different days have different room distributions, testing robustness
 
 #### Output Files
 ```
 cleaned_dataset/split_data/
-├── model_selection/
-│   ├── train.csv          # Day 1+2 for training
-│   └── val.csv            # Day 3 for validation
-└── model_validation/
+├── fold1/
+│   ├── train.csv          # Day 2+3+4 for training
+│   └── test.csv           # Day 1 for testing
+├── fold2/
+│   ├── train.csv          # Day 1+3+4 for training
+│   └── test.csv           # Day 2 for testing
+├── fold3/
+│   ├── train.csv          # Day 1+2+4 for training
+│   └── test.csv           # Day 3 for testing
+└── fold4/
     ├── train.csv          # Day 1+2+3 for training
     └── test.csv           # Day 4 for testing
 ```
@@ -348,7 +371,7 @@ All modeling approaches and experimental details are documented in `model/approa
 - Evaluation metrics and results
 - Lessons learned and future improvements
 
-Each approach is organized in its own subdirectory (`approach_1/` through `approach_6/`) containing the relevant notebooks, scripts, and outputs.
+Each approach is organized in its own subdirectory (`approach_1/` through `approach_8/`) containing the relevant notebooks, scripts, and outputs.
 
 ---
 
@@ -358,12 +381,12 @@ Each approach is organized in its own subdirectory (`approach_1/` through `appro
 
 **Training approach**:
 1. Use the labeled BLE dataset (`labelled_ble_data.csv`) which already has room labels matched to each sensor reading
-2. Split data temporally by day to prevent data leakage
+2. Split data temporally by day using 4-fold cross-validation to prevent data leakage
 3. Apply feature engineering and modeling techniques (see `model/approach_note.md` for details)
 4. Evaluate using Macro F1 score (competition metric)
-5. Generate frame-level predictions for competition submission
+5. Average results across 4 folds for robust performance estimation
 
-**Key challenge**: Different beacons are detected at different locations with varying signal strengths. The model must learn which combination of beacon signals corresponds to each room while handling class imbalance and unseen classes.
+**Key challenge**: Different beacons are detected at different locations with varying signal strengths. The model must learn which combination of beacon signals corresponds to each room while handling class imbalance and temporal generalization across different days.
 
 ---
 
@@ -379,4 +402,4 @@ This has been addressed in the data cleaning process by:
 2. Performing timestamp-based matching to align BLE readings with room labels
 3. Dropping 34% of BLE readings that fall outside labeled time ranges (expected behavior given the data collection design)
 
-**Class Imbalance**: Some rooms appear very rarely in the dataset, and temporal splitting may result in unseen classes in validation/test sets. This is handled through various techniques documented in `model/approach_note.md`.
+**Class Imbalance**: Some rooms appear very rarely in the dataset, and temporal splitting may result in different class distributions across folds. This is handled through various techniques documented in `model/approach_note.md`
