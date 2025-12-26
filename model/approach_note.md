@@ -477,7 +477,7 @@ df['room_group'] = (df['room'] != df['room'].shift()).cumsum()
 
 1. **Contact competition organizers** for test data format and submission requirements
 2. **Implement sliding window inference** as a baseline production approach
-3. **Test on Day 4 data** by removing labels and treating it as unlabeled test data
+3. **Test on 4 Folds data** by removing labels and treating it as unlabeled test data
 4. **Compare segmentation strategies** and measure performance degradation from "ideal" to "realistic"
 5. **Develop ensemble approach** combining multiple segmentation strategies
 6. **Consider hybrid models** that jointly learn to segment and classify
