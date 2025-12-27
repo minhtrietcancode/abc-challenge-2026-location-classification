@@ -1,5 +1,5 @@
 ============================================================
-FOLD 1 - RAW DATA
+FOLD 1 - RAW DATA - DAY 4 DATA AS TEST SET
 ============================================================
 Room                 Train Count     Test Count     
 --------------------------------------------------
@@ -21,7 +21,7 @@ Total: 962294 train samples, 30619 test samples
 
 
 ============================================================
-FOLD 1 - WINDOWED DATA
+FOLD 1 - WINDOWED DATA - DAY 4 DATA AS TEST SET
 ============================================================
 Room                 Train Count     Test Count     
 --------------------------------------------------
@@ -44,7 +44,7 @@ Total: 19280 train windows, 2481 test windows
 
 
 ============================================================
-FOLD 2 - RAW DATA
+FOLD 2 - RAW DATA - DAY 3 DATA AS TEST SET
 ============================================================
 Room                 Train Count     Test Count     
 --------------------------------------------------
@@ -71,7 +71,7 @@ Total: 951141 train samples, 143401 test samples
 
 
 ============================================================
-FOLD 2 - WINDOWED DATA
+FOLD 2 - WINDOWED DATA - DAY 3 DATA AS TEST SET
 ============================================================
 Room                 Train Count     Test Count     
 --------------------------------------------------
@@ -99,7 +99,7 @@ Total: 17506 train windows, 5932 test windows
 
 
 ============================================================
-FOLD 3 - RAW DATA
+FOLD 3 - RAW DATA - DAY 2 DATA AS TEST SET
 ============================================================
 Room                 Train Count     Test Count     
 --------------------------------------------------
@@ -123,7 +123,7 @@ Total: 747816 train samples, 333507 test samples
 
 
 ============================================================
-FOLD 3 - WINDOWED DATA
+FOLD 3 - WINDOWED DATA - DAY 2 DATA AS TEST SET
 ============================================================
 Room                 Train Count     Test Count     
 --------------------------------------------------
@@ -148,7 +148,7 @@ Total: 15136 train windows, 7739 test windows
 
 
 ============================================================
-FOLD 4 - RAW DATA
+FOLD 4 - RAW DATA - DAY 1 DATA AS TEST SET
 ============================================================
 Room                 Train Count     Test Count     
 --------------------------------------------------
@@ -169,7 +169,7 @@ Total: 465004 train samples, 590447 test samples
 
 
 ============================================================
-FOLD 4 - WINDOWED DATA
+FOLD 4 - WINDOWED DATA - DAY 1 DATA AS TEST SET
 ============================================================
 Room                 Train Count     Test Count     
 --------------------------------------------------
