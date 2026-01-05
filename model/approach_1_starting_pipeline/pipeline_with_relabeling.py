@@ -734,7 +734,7 @@ def main():
     print(f"{'='*80}")
     
     # Save detailed results
-    with open('relabeling_results.txt', 'w') as f:
+    with open('pipeline_with_relabeling.txt', 'w') as f:
         f.write("="*80 + "\n")
         f.write("INDOOR LOCALIZATION RESULTS WITH KL DIVERGENCE RELABELING\n")
         f.write("="*80 + "\n\n")
@@ -776,7 +776,7 @@ def main():
         f.write(f"Min Macro F1: {np.min(macro_f1_scores):.4f}\n")
         f.write(f"Max Macro F1: {np.max(macro_f1_scores):.4f}\n")
     
-    print("\n✅ Detailed results saved to 'relabeling_results.txt'")
+    print("\n✅ Detailed results saved to 'pipeline_with_relabeling.txt'")
     
     return results_with_relabeling
 
