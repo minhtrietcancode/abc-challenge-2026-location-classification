@@ -1,0 +1,158 @@
+================================================================================
+INDOOR LOCALIZATION RESULTS WITH KL DIVERGENCE RELABELING
+================================================================================
+
+CONFIGURATION:
+--------------------------------------------------------------------------------
+Matching Type: FULL (complete 6 beacons only)
+Augmentation Factor: 1.0 (double minority class)
+Number of Minority Classes: 2
+
+RESULTS PER FOLD:
+--------------------------------------------------------------------------------
+
+Fold 1:
+  Macro F1: 0.2830
+  Weighted F1: 0.4643
+
+  Per-class F1 scores:
+    505                 : 0.0000
+    506                 : 0.3939
+    508                 : 0.0000
+    513                 : 0.3220
+    515                 : 0.1137
+    517                 : 0.0952
+    518                 : 0.0563
+    520                 : 0.2727
+    523                 : 0.7257
+    cafeteria           : 0.3246
+    cleaning            : 0.1851
+    kitchen             : 0.6892
+    nurse station       : 0.5007
+
+  Relabeling Details:
+    505:
+      Best Match: 508
+      KL Divergence: 6.9270
+      Original Samples: 4
+      Added Samples: 4
+      New Total: 8
+    508:
+      Best Match: 520
+      KL Divergence: 3.3974
+      Original Samples: 17
+      Added Samples: 17
+      New Total: 34
+
+Fold 2:
+  Macro F1: 0.2486
+  Weighted F1: 0.4677
+
+  Per-class F1 scores:
+    501                 : 0.2105
+    502                 : 0.0282
+    505                 : 0.0000
+    506                 : 0.2568
+    511                 : 0.1791
+    512                 : 0.4221
+    513                 : 0.1509
+    515                 : 0.0814
+    517                 : 0.0000
+    518                 : 0.0000
+    520                 : 0.5888
+    522                 : 0.1892
+    523                 : 0.4592
+    cafeteria           : 0.4112
+    cleaning            : 0.2734
+    hallway             : 0.0041
+    kitchen             : 0.6760
+    nurse station       : 0.5442
+
+  Relabeling Details:
+    502:
+      Best Match: 511
+      KL Divergence: 44.1729
+      Original Samples: 9
+      Added Samples: 9
+      New Total: 18
+    518:
+      Best Match: 502
+      KL Divergence: 20.0601
+      Original Samples: 22
+      Added Samples: 9
+      New Total: 31
+
+Fold 3:
+  Macro F1: 0.2633
+  Weighted F1: 0.5795
+
+  Per-class F1 scores:
+    502                 : 0.1111
+    511                 : 0.2069
+    512                 : 0.7034
+    513                 : 0.4364
+    516                 : 0.0000
+    517                 : 0.0000
+    518                 : 0.0000
+    520                 : 0.2857
+    522                 : 0.0219
+    523                 : 0.4107
+    cafeteria           : 0.3395
+    cleaning            : 0.1205
+    hallway             : 0.0611
+    kitchen             : 0.4786
+    nurse station       : 0.7731
+
+  Relabeling Details:
+    516:
+      Best Match: 522
+      KL Divergence: 44.6138
+      Original Samples: 10
+      Added Samples: 10
+      New Total: 20
+    517:
+      Best Match: 516
+      KL Divergence: 16.6900
+      Original Samples: 10
+      Added Samples: 10
+      New Total: 20
+
+Fold 4:
+  Macro F1: 0.3455
+  Weighted F1: 0.5976
+
+  Per-class F1 scores:
+    501                 : 0.7928
+    506                 : 0.0267
+    508                 : 0.3077
+    511                 : 0.0000
+    516                 : 0.1429
+    520                 : 0.1007
+    523                 : 0.6667
+    cafeteria           : 0.5302
+    cleaning            : 0.2381
+    hallway             : 0.0258
+    kitchen             : 0.5385
+    nurse station       : 0.7760
+
+  Relabeling Details:
+    516:
+      Best Match: 508
+      KL Divergence: 52.3764
+      Original Samples: 13
+      Added Samples: 13
+      New Total: 26
+    501:
+      Best Match: 508
+      KL Divergence: 8.7928
+      Original Samples: 15
+      Added Samples: 15
+      New Total: 30
+
+================================================================================
+SUMMARY STATISTICS:
+================================================================================
+Mean Macro F1: 0.2851 ± 0.0369
+Mean Weighted F1: 0.5273 ± 0.0616
+Min Macro F1: 0.2486
+Max Macro F1: 0.3455
