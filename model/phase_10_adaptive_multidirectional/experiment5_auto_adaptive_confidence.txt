@@ -1,0 +1,50 @@
+================================================================================
+EXPERIMENT 5: AUTO-CALIBRATING ADAPTIVE THRESHOLDS
+================================================================================
+
+Key Innovation:
+--------------------------------------------------------------------------------
+Instead of fixed thresholds (Exp 4), calculate them dynamically per fold:
+  - Analyze confidence distributions from all 7 directions
+  - centered_boost = centered_mean + 0.025
+  - high_conf = overall_mean + 1.0 * std
+  - very_high_conf = overall_mean + 1.5 * std
+This auto-calibrates for each fold's unique characteristics!
+
+OVERALL RESULTS:
+--------------------------------------------------------------------------------
+Mean Macro F1: 0.4390 ± 0.0371
+
+PROGRESSION:
+--------------------------------------------------------------------------------
+Baseline: 0.4106
+Exp 2: 0.4384
+Exp 4: 0.4392 (fold-specific: Fold 1 great, others declined)
+Exp 5: 0.4390 (auto-calibrated per fold)
+
+Per-Fold Results:
+--------------------------------------------------------------------------------
+
+Fold 1:
+  Seed    42: 0.5227 (thresholds: 0.669, 0.841, 0.928)
+  Seed   123: 0.4972 (thresholds: 0.668, 0.840, 0.925)
+  Seed   456: 0.4780 (thresholds: 0.649, 0.811, 0.895)
+  Mean: 0.4993 (Exp 4: 0.5094, change: -0.0101)
+
+Fold 2:
+  Seed    42: 0.4139 (thresholds: 0.639, 0.797, 0.884)
+  Seed   123: 0.4289 (thresholds: 0.623, 0.770, 0.851)
+  Seed   456: 0.4260 (thresholds: 0.623, 0.779, 0.863)
+  Mean: 0.4230 (Exp 4: 0.4231, change: -0.0001)
+
+Fold 3:
+  Seed    42: 0.4080 (thresholds: 0.662, 0.817, 0.896)
+  Seed   123: 0.4324 (thresholds: 0.641, 0.803, 0.886)
+  Seed   456: 0.4000 (thresholds: 0.610, 0.779, 0.863)
+  Mean: 0.4135 (Exp 4: 0.4072, change: +0.0063)
+
+Fold 4:
+  Seed    42: 0.4260 (thresholds: 0.669, 0.800, 0.872)
+  Seed   123: 0.4095 (thresholds: 0.679, 0.825, 0.905)
+  Seed   456: 0.4257 (thresholds: 0.640, 0.778, 0.851)
+  Mean: 0.4204 (Exp 4: 0.4172, change: +0.0032)
