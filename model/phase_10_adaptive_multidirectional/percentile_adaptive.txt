@@ -1,0 +1,56 @@
+================================================================================
+EXPERIMENT 6: PERCENTILE-BASED ADAPTIVE THRESHOLDS
+================================================================================
+
+Key Innovation:
+--------------------------------------------------------------------------------
+Use PERCENTILES instead of mean+std for threshold calculation:
+  - Very high conf: 85th percentile (top 15%)
+  - High conf: 70th percentile (top 30%)
+  - Centered boost: 60th percentile of centered predictions
+  - Low conf: 40th percentile (bottom 40%)
+
+Advantages:
+  - Robust to outliers
+  - Distribution-agnostic (no normal distribution assumption)
+  - Directly interpretable
+  - Automatically adapts to each fold
+
+OVERALL RESULTS:
+--------------------------------------------------------------------------------
+Mean Macro F1: 0.4394 ± 0.0399
+
+PROGRESSION:
+--------------------------------------------------------------------------------
+Baseline: 0.4106
+Exp 2: 0.4384 (7 directions, standard weighting)
+Exp 4: 0.4392 (fixed thresholds, fold-specific)
+Exp 5: 0.4390 (mean+std adaptive)
+Exp 6: 0.4394 (percentile-based)
+
+Per-Fold Results:
+--------------------------------------------------------------------------------
+
+Fold 1:
+  Seed    42: 0.5275 (thresholds: centered=0.695, high=0.768, very_high=0.852, low=0.625)
+  Seed   123: 0.4963 (thresholds: centered=0.690, high=0.767, very_high=0.872, low=0.618)
+  Seed   456: 0.4904 (thresholds: centered=0.668, high=0.734, very_high=0.817, low=0.596)
+  Mean: 0.5047 ± 0.0163
+
+Fold 2:
+  Seed    42: 0.4142 (thresholds: centered=0.709, high=0.760, very_high=0.806, low=0.572)
+  Seed   123: 0.4303 (thresholds: centered=0.663, high=0.713, very_high=0.773, low=0.577)
+  Seed   456: 0.4269 (thresholds: centered=0.673, high=0.730, very_high=0.778, low=0.577)
+  Mean: 0.4238 ± 0.0070
+
+Fold 3:
+  Seed    42: 0.4056 (thresholds: centered=0.703, high=0.763, very_high=0.816, low=0.643)
+  Seed   123: 0.4313 (thresholds: centered=0.681, high=0.752, very_high=0.812, low=0.595)
+  Seed   456: 0.3963 (thresholds: centered=0.646, high=0.730, very_high=0.796, low=0.570)
+  Mean: 0.4111 ± 0.0148
+
+Fold 4:
+  Seed    42: 0.4239 (thresholds: centered=0.702, high=0.733, very_high=0.783, low=0.643)
+  Seed   123: 0.4070 (thresholds: centered=0.712, high=0.764, very_high=0.816, low=0.634)
+  Seed   456: 0.4231 (thresholds: centered=0.642, high=0.713, very_high=0.781, low=0.595)
+  Mean: 0.4180 ± 0.0078
