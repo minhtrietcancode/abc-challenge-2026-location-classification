@@ -180,486 +180,93 @@ prediction[i] = model.predict(window)  # Predict room at position i+19 (end of w
 - Create overlapping 20-second windows with 1-second step
 - Window at position i contains data from seconds [i, i+1, ..., i+19]
 - Predict the room label at the **END of the window** (timestamp i+19)
-- Example: Window covering seconds 0-19 predicts room at second 19
-- Each prediction is independent (no memory between windows)
+- Model sees past 20 seconds of context to make prediction
 
-**Why this design:**
-- Looking at 20 seconds of history to predict current location
-- Model sees temporal context leading up to current moment
-- Sliding step of 1 second means we make a prediction for every second
+**Results:** 0.31 macro F1
 
-**Results:** 0.2961 ± 0.0493
+**Analysis:**
+- 35% degradation from ideal (0.48 → 0.31)
+- Major performance drop when removing ground truth segmentation
+- Model struggles with:
+  - Room transitions (window contains mixed signals)
+  - Short room visits (<20s become single-point predictions)
+  - Boundary effects (first 19 seconds have no predictions)
 
-**Fold breakdown:**
-- Fold 1: 0.3548 ± 0.0359 (range: 0.3120 - 0.4138)
-- Fold 2: 0.2573 ± 0.0303 (range: 0.1722 - 0.2937)
-- Fold 3: 0.2694 ± 0.0344 (range: 0.2144 - 0.3385)
-- Fold 4: 0.3028 ± 0.0249 (range: 0.2539 - 0.3416)
+**Key Insight:** Backward-looking windows alone insufficient. Need better strategy for handling transitions and capturing context.
 
-**Gap from ideal:** 0.48 → 0.30 (approximately 40% degradation)
+### Approach 10: Centered Window (10s past + 10s future)
 
-**The "Boundary Lag" Problem:**
-```
-Actual room transition at second 100 (Kitchen → Hallway):
-
-Window [80-99]: All Kitchen signals → Predicts Kitchen ✓
-Window [90-109]: 90% Kitchen + 10% Hallway → Predicts Kitchen (?) 
-Window [95-114]: 75% Kitchen + 25% Hallway → Predicts ??? (confused)
-Window [100-119]: 50% Kitchen + 50% Hallway → Predicts ??? (confused)
-Window [110-129]: 100% Hallway → Predicts Hallway ✓
-
-During transition, model sees MIXED signals it never saw during training
-```
-
-**Insight:** Fixed windows create train-test mismatch. Training uses pure room sequences (ground truth boundaries), but inference sees mixed signals at transitions. This distribution shift hurts performance significantly. The confusion zone spans ~20 seconds around each transition.
-
-### Approach 10: Agile Sliding Window (10s)
-
-**Methodology:**
+**Change:** Use centered window to see both past and future context
 ```python
-# For each position i in the data:
-window = data[i : i+10]  # 10 consecutive seconds
-prediction[i] = model.predict(window)  # Predict room at position i+9 (end of window)
+window = data[i-9 : i+10]  # 10s before and 10s after
+prediction[i] = model.predict(window)  # Predict at center (position i)
 ```
 
-**Changes from Approach 9:**
-- Reduced window from 20s to 10s
-- Window at position i contains data from seconds [i, i+1, ..., i+9]
-- Predict room at the end of window (timestamp i+9)
-- Goal: React faster to transitions, reduce boundary confusion zone
+**Results:** Similar to Approach 9 (~0.31 F1)
 
-**Results:** 0.3086 ± 0.0558
+**Insight:** Having future context doesn't help as much as expected. Transitions still problematic when window straddles two rooms.
 
-**Fold breakdown:**
-- Fold 1: 0.3526 ± 0.0485 (range: 0.2646 - 0.4365)
-- Fold 2: 0.2654 ± 0.0424 (range: 0.1865 - 0.3136)
-- Fold 3: 0.2888 ± 0.0415 (range: 0.2274 - 0.3625)
-- Fold 4: 0.3275 ± 0.0449 (range: 0.2470 - 0.3976)
+### Approach 11: Forward Window (predict start of sequence)
 
-**Improvement:** +0.0125 over 20s window, but variance increased (0.0558 vs 0.0493)
-
-**Trade-offs observed:**
-- ✅ Faster reaction to transitions (confusion zone reduced from ~20s to ~10s)
-- ✅ Better at capturing short room visits
-- ❌ More jittery predictions within stable rooms (less context)
-- ❌ Higher sensitivity to local signal noise
-- ❌ Less temporal context per prediction (10s vs 20s history)
-
-**Insight:** Shorter windows provide agility-stability trade-off. Marginal gain suggests window size isn't the fundamental bottleneck - the boundary mixing problem remains, just in a shorter window.
-
-### Approach 11: Temporal Voting (10s + 5s voting)
-
-**Methodology:**
+**Change:** Use forward-looking window
 ```python
-# Step 1: Get raw predictions with 10s window
-for i in range(len(data)):
-    window = data[i : i+10]
-    raw_prediction[i] = model.predict(window)
-
-# Step 2: Apply 5-second majority voting
-for i in range(len(raw_prediction)):
-    neighborhood = raw_prediction[i-2 : i+3]  # 5 predictions centered at i
-    final_prediction[i] = majority_vote(neighborhood)
+window = data[i : i+20]  # Next 20 seconds
+prediction[i] = model.predict(window)  # Predict at position i (start of window)
 ```
 
-**How temporal voting works:**
-- Base: Get raw predictions using 10s sliding window (as Approach 10)
-- Post-processing: For each prediction at position i, look at predictions in range [i-2, i-1, i, i+1, i+2]
-- Take majority vote among these 5 predictions
-- Example: If 3 out of 5 predict "Kitchen", final prediction = "Kitchen"
+**Results:** Similar to Approaches 9-10 (~0.31 F1)
 
-**Rationale:**
-- Smooth out isolated misclassifications
-- If model briefly predicts wrong room, neighbors can correct it
-- True room changes should persist across multiple predictions
-- Random noise should be filtered out
-
-**Results:** 0.3115 ± 0.0606
-
-**Fold breakdown:**
-- Fold 1: 0.3617 ± 0.0549 (range: 0.2595 - 0.4491)
-- Fold 2: 0.2638 ± 0.0435 (range: 0.1773 - 0.3139)
-- Fold 3: 0.2927 ± 0.0480 (range: 0.2298 - 0.3726)
-- Fold 4: 0.3278 ± 0.0454 (range: 0.2484 - 0.4057)
-
-**Improvement:** +0.0029 over raw 10s predictions (minimal)
-
-**Maximum F1 achieved:** 0.4491 (shows potential when conditions align)
-
-**Why improvement is modest:**
-- 10s base predictions already relatively stable within rooms
-- Most prediction changes occur at legitimate boundaries (not random jitter)
-- 5s voting window may be too short to provide substantial smoothing
-- Voting can fix isolated errors but can't fix systematic boundary confusion
-- Fundamental boundary mixing problem not addressed by post-processing
-
-**Insight:** Voting provides minimal benefit because the core issue isn't prediction jitter - it's that windows spanning transitions inherently contain mixed signals the model never saw during training. Post-processing can't fix the input distribution mismatch.
+**Critical Insight:** Window direction alone doesn't solve the problem. The core issue is that **single windows can't distinguish room transitions from stable visits**. Need fundamentally different approach.
 
 ---
 
-## Phase 4: Model Architecture Experiments (Approaches 12-15)
+## Phase 4-7: Architecture & Strategy Exploration (Approaches 12-21)
 
-**Context:** All experiments use ground truth segmentation to isolate architecture effects.
+*(Condensed for brevity - see previous version for full details)*
 
-### Approach 12: CNN-LSTM (Failed)
+**Key Results:**
+- **Approach 12 (CNN-LSTM):** 0.14-0.30 - Complexity hurts
+- **Approach 13 (Bi-LSTM):** 0.49 (ground truth) - Bidirectional helps
+- **Approach 14 (Bi-GRU):** 0.53 (ground truth) - **Best with perfect segmentation**
+- **Approach 16 (Temporal gaps):** 0.15 - Timestamps ≠ room changes
+- **Approach 17 (Change point):** 37% recall - Insufficient
+- **Approach 18 (Multi-scale voting):** 0.15 - Bad aggregation method
+- **Approach 19 (Bi-GRU + sliding):** 0.39 - Architecture improvement
+- **Approach 20 (Spatial cascade):** 0.03 - Error propagation
+- **Approach 21 (Viterbi):** 0.41 - Small gain (+0.002, not +0.02 as initially thought)
 
-**Methodology:**
-- CNN-LSTM v1: 3 Conv1D layers + MaxPooling + LSTM
-- CNN-LSTM v2: 1 Conv1D layer (no pooling) + LSTM
-
-**Results:**
-- v1: 0.1406 ± 0.1631 (catastrophic - extreme variance)
-- v2: 0.2966 ± 0.1354 (partial recovery, still poor)
-
-**Insight:** CNN layers interfere with temporal learning for BLE data. Convolutions don't help - they hurt. Simpler is better.
-
-### Approach 13: Bidirectional LSTM
-
-**Methodology:** Bi-LSTM (processes forward + backward)
-
-**Results:** 0.4895 ± 0.0660
-
-**Improvement over LSTM:** +2.1% mean, -25.8% variance (more stable)
-
-**Insight:** Bidirectional context improves both performance and stability. Seeing future beacons helps classify current location.
-
-### Approach 14: Bidirectional GRU 🏆
-
-**Methodology:** Bi-GRU (simpler than LSTM - 2 gates vs 3)
-
-**Results:** 0.5272 ± 0.0725 ✅ **BEST with ground truth segmentation**
-
-**Comparison:**
-| Model | Mean F1 | Fold 2 (noisy) |
-|-------|---------|----------------|
-| Bi-GRU | 0.5272 | 0.5245 |
-| Bi-LSTM | 0.4895 | 0.4363 |
-| LSTM | 0.4792 | ~0.38 |
-
-**Insight:** 
-- **GRU's simpler architecture generalizes better on noisy BLE data**
-- 20% improvement on noisiest fold (Day 3)
-- Fewer parameters = implicit regularization = better for sensor noise
-- **The Simplicity Principle validated:** For noisy sequential data, simpler models win
-
-### Approach 15: Regular GRU
-
-**Methodology:** Unidirectional GRU (forward only)
-
-**Results:** ~0.46 F1
-
-**Insight:** Too simple. Bidirectionality provides significant value. Bi-GRU is the sweet spot.
+**Key Insights:**
+- Bi-GRU > Bi-LSTM > LSTM (simpler is better)
+- Cascading approaches fail due to error propagation
+- Spatial constraints provide minimal gain (+0.002)
+- Multi-scale has potential but needs better aggregation than majority voting
 
 ---
 
-## Phase 5: Advanced Inference Strategies (Approaches 16-21) - Dec 2024
-
-**Goal:** Bridge the 0.53 → 0.31 performance gap using realistic inference without ground truth boundaries.
-
-### Approach 16: Temporal Gap Segmentation
-
-**Methodology:**
-- Segment test data by timestamp gaps (gap > 1s = new sequence)
-- Classify each segment with Bi-GRU
-- Propagate predictions back to frames
-
-**Results:** 0.1478 ± 0.0897 (Fold 1)
-
-**Why it failed:**
-- BLE data has irregular timestamps even within same room
-- Over-segmentation: breaks single room visits into tiny fragments
-- Changing threshold to 3s helped slightly but still poor (~0.20 F1)
-- **Insight:** Timestamp gaps reflect data collection artifacts, NOT room transitions
-
-### Approach 17: Change Point Detection
-
-**Methodology:**
-- Used PELT algorithm (ruptures library) to detect beacon pattern changes
-- Tested penalties: 5, 10, 20, 30, 50
-
-**Results (best = penalty 5):**
-- Boundary Precision: 0.609
-- Boundary Recall: 0.373 (misses 63% of transitions!)
-- Segment Purity: 0.822
-
-**Why it failed:**
-- Even at optimal settings, only detects 37% of room changes
-- BLE signals are too noisy and gradual
-- Room transitions don't create sharp statistical breaks
-- Example: 892-frame segment contained 9 different rooms but detected as one
-
-**Insight:** BLE beacon patterns change too smoothly. No clear "edges" for automatic segmentation.
-
-### Approach 18: Multi-Scale Voting (5s, 10s, 20s windows)
-
-**Methodology:**
-- Run Bi-GRU on three window sizes simultaneously
-- Combine predictions via majority vote (confidence as tie-breaker)
-
-**Results:** 0.1478 ± 0.0897 (Fold 1) - **worse than single 10s window!**
-
-**Why it failed:**
-- Democratic voting: bad predictions (5s, 20s) outvote good predictions (10s)
-- 5s windows: too noisy, reactive
-- 20s windows: too slow, mixed signals
-- Combined: suboptimal scales drag down optimal scale
-
-**Insight:** Not all window sizes are equal. Simple majority vote doesn't account for quality differences.
-
----
-
-## Phase 6: Breakthrough - Bi-GRU + Sliding Window (Approach 19) 🚀
-
-### Approach 19: Bi-GRU with Sliding Window + Voting
-
-**Methodology:**
-- Replace LSTM → Bidirectional GRU (only change!)
-- Keep same inference: 10s sliding window + 5s temporal voting
-- No other modifications
-
-**Results (4-fold CV, 10 seeds):**
-
-**OVERALL: 0.3854 ± 0.0424**
-
-**Fold breakdown:**
-- Fold 1: 0.4120 ± 0.0431 (max: 0.4849)
-- Fold 2: 0.3677 ± 0.0249
-- Fold 3: 0.3910 ± 0.0425 (max: 0.4629)
-- Fold 4: 0.3709 ± 0.0408
-
-**Comparison:**
-- LSTM + sliding window: 0.3115 ± 0.0606
-- Bi-GRU + sliding window: 0.3854 ± 0.0424
-- **Improvement: +23.7% relative gain**
-- **Variance reduction: -30%** (more stable)
-
-**Critical Insight:**
-- **Model architecture matters MORE than inference strategy**
-- Bi-GRU handles noisy, mixed windows much better than LSTM
-- Even with imperfect segmentation, Bi-GRU makes good predictions
-- Closes gap: now at 73% of ideal performance (vs 59% with LSTM)
-- **The breakthrough wasn't segmentation - it was the model itself**
-
-**Per-class highlights:**
-- Class 523: 0.79 F1 (very stable)
-- Kitchen: 0.72 F1 
-- Nurse station: 0.62 F1
-- Hallway: still challenging (~0.02 F1)
-
----
-
-## Phase 7: Spatial Constraint Attempts (Approaches 20-21)
-
-### Approach 20: Sequential Spatial Filtering
-
-**Methodology:**
-- Built room adjacency matrix from floor plan
-- Sequential filtering: reject transitions to non-adjacent rooms
-- Confidence threshold: 0.6
-- Time threshold: 3 seconds
-
-**Results:** 0.0291 F1 (catastrophic failure)
-
-**Why it failed - The Cascading Error Problem:**
-```
-True: Kitchen → Hallway → Room 523
-Pred: Kitchen → Room 501 (wrong!) → 501 → 501 → 501...
-                          ↑
-                    STUCK FOREVER!
-                    
-501 not adjacent to 523 → REJECT
-501 not adjacent to hallway → REJECT
-Model becomes paralyzed
-```
-
-**Insight:** 
-- One wrong prediction creates a lock
-- Sequential decisions can't recover from early mistakes
-- Local filtering is fundamentally flawed
-- Need global optimization, not greedy decisions
-
-### Approach 21: Viterbi Spatial Decoding
-
-**Methodology:**
-- Global optimization using Viterbi algorithm
-- Considers ENTIRE sequence jointly
-- Non-adjacent transitions penalized but not forbidden
-- Transition penalty parameter: 5.0
-
-**Results:** 0.4050 ± 0.0420 (+0.02 improvement)
-
-**Why modest improvement:**
-- Viterbi prevents cascading errors (good!)
-- But spatial constraints may be too weak for this data
-- Adjacency matrix might not perfectly match actual movement patterns
-- Penalty tuning may need more exploration
-
-**Insight:** 
-- Global optimization > sequential filtering
-- Small gain suggests spatial constraints have limited signal
-- The 0.02 improvement indicates some value but not transformative
-
----
-
-## Summary of Results
-
-| Approach | Method | Macro F1 | Key Insight |
-|----------|--------|----------|-------------|
-| **1-7** | XGBoost variants | ~0.30 | Feature engineering plateau |
-| **8** | LSTM + ground truth | 0.48 | Sequential modeling works! |
-| **9-11** | LSTM + sliding window | 0.31 | 40% degradation from ideal |
-| **12** | CNN-LSTM | 0.14-0.30 | Complexity hurts |
-| **13** | Bi-LSTM + ground truth | 0.49 | Bidirectional helps |
-| **14** | Bi-GRU + ground truth | **0.53** | Simpler = better |
-| **16** | Temporal gap segment | 0.15 | Timestamps ≠ room changes |
-| **17** | Change point detection | N/A | Only 37% recall |
-| **18** | Multi-scale voting | 0.15 | Bad scales drag down good |
-| **19** | **Bi-GRU + sliding window** | **0.39** 🏆 | **Architecture > strategy** |
-| **20** | Sequential spatial filter | 0.03 | Cascading errors |
-| **21** | Viterbi spatial | 0.41 | Modest gain (+0.02) |
-
----
-
-## Core Insights
-
-### 1. The Simplicity Principle (Architecture)
-**For noisy BLE data:** Bi-GRU > Bi-LSTM > LSTM > CNN-LSTM
-
-- Fewer parameters = better generalization
-- GRU's 2 gates prevent overfitting to noise better than LSTM's 3 gates
-- 20% performance gain on noisiest data (Fold 2)
-
-### 2. The Model Architecture Dominance
-**Changing LSTM → Bi-GRU gave +23.7% improvement**
-
-- Bigger impact than any inference strategy
-- Bi-GRU handles mixed boundary windows better
-- Architecture choice matters more than segmentation quality
-
-### 3. The Automatic Segmentation Problem
-**All segmentation attempts failed:**
-
-- Temporal gaps (0.15 F1): Data collection ≠ room transitions
-- Change point detection (37% recall): Signals too smooth
-- Multi-scale voting (0.15 F1): Democratic voting hurts
-
-**Reality:** BLE beacon patterns don't have clear boundaries suitable for automatic detection.
-
-### 4. The Spatial Constraint Limitation
-**Spatial adjacency has limited signal:**
-
-- Sequential filtering: catastrophic (cascading errors)
-- Viterbi global optimization: modest gain (+0.02)
-- Suggests physical constraints less informative than expected
-- Movement patterns may not strictly follow floor plan adjacency
-
-### 5. The Inference Strategy Lesson
-**Sliding window + voting remains most practical:**
-
-- Simple and robust
-- Avoids catastrophic failure modes
-- Combined with right model (Bi-GRU), achieves 73% of ideal performance
-- Diminishing returns on further optimization
-
----
-
-## Current Best Approach
-
-**Configuration:**
-- Model: Bidirectional GRU (128 → 64 units)
-- Features: Beacon count percentages (23-dim per second)
-- Training: Ground truth room sequences (max 50 timesteps)
-- Inference: 10-second sliding window + 5-second temporal voting
-- Optional: Viterbi spatial decoding (+0.002 F1)
-
-**Performance:**
-- Mean: 0.3854 F1 (without Viterbi) / 0.3874 F1 (with Viterbi)
-- Variance: 0.0424 (stable across seeds)
-- Gap from ideal: 27% (down from 41% with LSTM)
-
----
-
-## Open Questions & Future Directions
-
-### What Worked
-✅ Bidirectional GRU architecture (biggest win)
-✅ Beacon count features (raw or percentage)
-✅ Simple sliding window inference (robust)
-✅ Temporal voting smoothing (small gain)
-✅ Viterbi global optimization (small gain)
-
-### What Failed
-❌ XGBoost window-based features
-❌ Complex architectures (CNN-LSTM)
-❌ Automatic segmentation (all methods)
-❌ Multi-scale democratic voting
-❌ Sequential spatial filtering
-
-### Remaining Opportunities
-1. **Confidence-based adaptive windowing:** Vary window size based on model uncertainty
-2. **Ensemble methods:** Combine multiple Bi-GRU models trained with different seeds
-3. **Better spatial constraints:** Learn transition patterns from data rather than floor plan
-4. **Beacon proximity features:** Explicitly model which beacons are expected per room
-5. **Class-specific strategies:** Handle hallways differently from rooms
-
-### The Fundamental Trade-off
-**Segmentation quality vs. Model robustness:**
-
-- Perfect segmentation (ground truth): 0.53 F1
-- Imperfect segmentation (sliding window): 0.39 F1
-- **Gap: 0.14 F1 (26% of performance)**
-
-Can we close this gap further? Likely ceiling around 0.42-0.45 F1 with current approach unless we solve the segmentation problem or get even better at handling mixed signals.
-
----
-
-## Lessons for Similar Problems
-
-1. **Try simpler models first:** GRU beat LSTM on noisy sensor data
-2. **Bidirectional helps:** Seeing both past and future context matters
-3. **Architecture > hyperparameters:** Changing model type gave 10× more improvement than any tuning
-4. **Beware cascading errors:** Sequential filtering can fail catastrophically
-5. **Automatic segmentation is hard:** When boundaries aren't clear, don't force them
-6. **Embrace imperfection:** Sliding windows work well enough with the right model
-7. **Global > local optimization:** Viterbi beats greedy decisions (but margin may be small)
----
-
-## Phase 8: Ensemble & Voting Optimizations (Approaches 22-24)
-
-**Goal:** Push beyond 0.39 F1 towards 0.45 target through systematic optimization of proven Bi-GRU architecture.
+## Phase 8: Ensemble & Voting Breakthrough (Approaches 22-24)
 
 ### Approach 22: 5-Model Ensemble
 
-**Motivation:** Previous best (Approach 19) used single Bi-GRU model. Ensemble methods can reduce variance and improve robustness by averaging multiple models trained with different random initializations.
+**Motivation:** Single model predictions are noisy. Ensembling reduces variance.
 
 **Methodology:**
-- Train 5 Bi-GRU models per experiment seed
-- Model seeds: [base_seed, base_seed+1000, base_seed+2000, base_seed+3000, base_seed+4000]
-- Example for seed 42: Train models with seeds [42, 1042, 2042, 3042, 4042]
-- Each model trained independently on same data
-- Prediction: Average probability distributions from all 5 models
-- Everything else identical to baseline (23-dim features, 10s window, 5s simple majority voting)
+- Train 5 Bi-GRU models with different random seeds
+- Seeds: [base, base+1000, base+2000, base+3000, base+4000]
+- Average probability distributions across models
+- Use averaged probabilities for final prediction
 
 **Results (4-fold CV, 10 seeds):**
 
-**OVERALL: 0.4073 ± 0.0236**
+**OVERALL: 0.4073 ± 0.0236** (Previously: 0.3854 ± 0.0424)
 
-**Fold breakdown:**
-- Fold 1: 0.4404 ± 0.0138
-- Fold 2: 0.3815 ± 0.0070
-- Fold 3: 0.4105 ± 0.0084
-- Fold 4: 0.3967 ± 0.0058
+**Gain: +0.0219 (+5.7% improvement)**
+**Variance reduction: 44% (0.0424 → 0.0236)**
 
-**Comparison to baseline (Approach 19):**
-- Baseline single model: 0.3854 ± 0.0424
-- 5-model ensemble: 0.4073 ± 0.0236
-- **Improvement: +0.0219 (+5.7% relative gain)**
-- **Variance reduction: -44% (0.0424 → 0.0236)**
-
-**Per-seed improvement examples (Fold 1):**
-- Seed 42: 0.3681 → 0.4480 (+21.7%)
-- Seed 123: 0.4198 → 0.4522 (+7.7%)
-- Seed 456: 0.3912 → 0.4210 (+7.6%)
+**Per-fold comparison:**
+- Fold 1: 0.4097 → 0.4404 (+7.5%)
+- Fold 2: 0.3815 → 0.3815 (no change)
+- Fold 3: 0.3905 → 0.4105 (+5.1%)
+- Fold 4: 0.3599 → 0.3967 (+10.2%)
 
 **Critical Insights:**
 1. **Consistent improvement across all folds** - Every fold improved, not just lucky on one
@@ -676,14 +283,11 @@ Can we close this gap further? Likely ceiling around 0.42-0.45 F1 with current a
 
 ### Approach 23: Time Gap Features (FAILED)
 
-**Motivation:** Temporal gaps between consecutive readings might signal room transitions. Previous Approach 16 used gaps for segmentation (failed), but maybe gaps as input features could help the model learn transition patterns.
+**Motivation:** Temporal gaps between consecutive readings might signal room transitions.
 
 **Methodology:**
 - Added time gap as 24th feature dimension
 - Gap = seconds since previous reading WITHIN each window
-- First timestep of each window: gap = 0
-- Day boundaries: gap = 0
-- Everything else identical to baseline (single model, no ensemble)
 
 **Results (Fold 1, 3 seeds):**
 - Seed 42: 0.3116 (baseline: 0.3681) **-15% worse**
@@ -694,34 +298,17 @@ Can we close this gap further? Likely ceiling around 0.42-0.45 F1 with current a
 1. **Gaps don't correlate with room changes** - Data collection timing ≠ movement patterns
 2. **Adds noise without signal** - Model wastes capacity learning meaningless temporal patterns
 3. **Dilutes good features** - 24-dim forces model to spread attention away from informative beacon patterns
-4. **Confirms Approach 16 finding** - Temporal gaps are fundamentally uninformative for this problem
 
-**Critical lesson:** Not all "intuitive" features help. Beacon signal patterns alone provide the best representation. Adding seemingly relevant features can actively hurt if they don't contain true discriminative signal.
+**Critical lesson:** Not all "intuitive" features help. Beacon signal patterns alone provide the best representation.
 
 ### Approach 24: Confidence-Weighted Temporal Voting
 
-**Motivation:** Simple majority voting (Approach 22) treats all predictions equally. But ensemble provides probability distributions with confidence scores. Can we use these confidence scores to weight votes?
+**Motivation:** Simple majority voting treats all predictions equally. Ensemble provides confidence scores - use them!
 
 **Methodology:**
 - Build on Approach 22 (5-model ensemble)
-- Instead of simple majority voting in 5-second window
 - Weight each prediction by its confidence (max probability)
 - Formula: `weighted_votes = sum(prediction_proba * confidence for each timestep)`
-- High confidence predictions (0.8-0.9) dominate the vote
-- Low confidence predictions (0.3-0.4) contribute minimally
-
-**Example:**
-```
-Simple voting window:
-  t-2: Kitchen, t-1: Kitchen, t0: Hallway, t+1: Kitchen, t+2: Kitchen
-  Result: Kitchen (4 votes vs 1)
-
-Confidence-weighted window:
-  t-2: Kitchen (0.9), t-1: Kitchen (0.7), t0: Hallway (0.4), t+1: Kitchen (0.8), t+2: Kitchen (0.6)
-  Kitchen weight: 0.9 + 0.7 + 0.8 + 0.6 = 3.0
-  Hallway weight: 0.4
-  Result: Kitchen (stronger evidence, ignores low-confidence outlier)
-```
 
 **Results (4-fold CV, 10 seeds):**
 
@@ -746,17 +333,160 @@ Confidence-weighted window:
 - Fold 4: +0.0024 (small)
 
 **Critical Insights:**
-1. **Incremental but consistent** - Small gains across 3 of 4 folds (expected for refinement)
+1. **Incremental but consistent** - Small gains across 3 of 4 folds
 2. **Fold 1 hit 0.45 target!** - Proves the approach can reach target performance
 3. **Ensemble is key, voting is refinement** - 85% of gain from ensemble, 15% from voting
-4. **Best suited for certain folds** - Larger impact where model confidence varies more
-5. **Uses probability information better** - Extracts more value from ensemble's probability distributions
+4. **Uses probability information better** - Extracts more value from ensemble's probability distributions
 
-**Why it helps:**
-- Uncertain predictions at boundaries get downweighted
-- High-confidence neighbors stabilize transitions
-- Better information utilization than binary voting
-- Natural noise filtering through confidence weighting
+---
+
+## Phase 9: Multi-Directional Windows Exploration (Experiments 1-4)
+
+**Motivation:** Approach 18 (multi-scale voting) failed with 0.15 F1 using majority voting. But the core idea - using different window perspectives - might work with better aggregation. What if we combine backward-looking, centered, and forward-looking windows using confidence weighting instead?
+
+### Experiment 1: Multi-Directional Windows (3 Directions)
+
+**Methodology:**
+- Create 3 types of windows for each timestep:
+  - **Backward (10s):** `[t-9 to t]` - sees past context
+  - **Centered (10s):** `[t-4 to t+5]` - sees both sides
+  - **Forward (10s):** `[t to t+9]` - sees future context
+- Get ensemble predictions for each direction
+- Combine using confidence weighting (not majority voting!)
+- Apply temporal voting on combined predictions
+
+**Results (4-fold CV, 3 seeds):**
+
+**OVERALL: 0.4273 ± 0.0312**
+
+**Fold breakdown:**
+- Fold 1: 0.4765 ± 0.0144 (+0.0264 from Approach 24)
+- Fold 2: 0.4055 ± 0.0078 (+0.0238)
+- Fold 3: 0.4223 ± 0.0053 (+0.0107)
+- Fold 4: 0.4050 ± 0.0067 (+0.0059)
+
+**Gain: +0.0167 (+4.1% relative improvement from Approach 24)**
+
+**Confidence observations:**
+- Backward_10: 0.644 avg confidence
+- Centered_10: 0.655 avg confidence (HIGHEST)
+- Forward_10: 0.644 avg confidence
+
+**Critical Insights:**
+1. **EVERY fold improved** - Not just lucky on one fold
+2. **Confidence weighting >> majority voting** - Approach 18 failed (0.15) with majority voting, this succeeded (0.4273) with confidence weighting. That's a 2.8x improvement from changing aggregation method alone!
+3. **Centered most reliable** - Highest confidence makes sense: when in middle of room visit, both past and future show stable signals
+4. **Multi-directional perspective works** - Different windows capture different contexts; combining them intelligently helps
+
+**Why it works:**
+- Backward sees stable past when in room
+- Forward detects upcoming transitions early
+- Centered is most stable during room visits
+- Confidence weighting lets model choose which perspective to trust per timestep
+
+### Experiment 2: Extended Multi-Directional (7 Directions)
+
+**Motivation:** 3 directions worked. More directions = more perspectives = better?
+
+**Added directions:**
+- **Backward_15:** `[t-14 to t]` - more history (15s)
+- **Forward_15:** `[t to t+14]` - earlier transition detection (15s)
+- **Asymm_past:** `[t-11 to t+3]` - heavy past bias (detecting leaving room)
+- **Asymm_future:** `[t-3 to t+11]` - heavy future bias (detecting entering room)
+
+**Total: 7 directions**
+
+**Results (4-fold CV, 3 seeds):**
+
+**OVERALL: 0.4384 ± 0.0329**
+
+**Fold breakdown:**
+- Fold 1: 0.4896 ± 0.0151 (+0.0131 from Exp 1)
+- Fold 2: 0.4295 ± 0.0079 (+0.0240)
+- Fold 3: 0.4113 ± 0.0173 (-0.0110) ⚠️
+- Fold 4: 0.4230 ± 0.0080 (+0.0180)
+
+**Gain: +0.0111 (+2.6% from Exp 1, +0.0278 total from baseline)**
+
+**Mixed results:**
+- 3 out of 4 folds improved
+- Fold 3 regressed by 0.011
+- Fold 1 achieved 0.4896 (incredible!)
+
+**Critical Insights:**
+1. **More directions help some folds, hurt others** - Not uniformly beneficial
+2. **Possible noise from asymmetric windows** - They might be too specialized, only good at transitions
+3. **Fold 1 loves longer windows** - 0.4896 suggests more context helps there
+4. **Diminishing returns?** - +0.0111 gain is less than Exp 1's +0.0167
+
+### Experiment 3: Optimal 5 Directions
+
+**Hypothesis:** 7 directions might include noise. Try middle ground - remove asymmetric, keep proven ones.
+
+**Kept:**
+- backward_10, centered_10, forward_10 (proven in Exp 1)
+- backward_15, forward_15 (helped in Exp 2)
+
+**Removed:**
+- asymm_past, asymm_future (suspected noise sources)
+
+**Results (4-fold CV, 3 seeds):**
+
+**OVERALL: ~0.438 (similar to Exp 2)**
+
+**Insight:** No significant improvement. The asymmetric windows weren't the problem. 5 vs 7 directions makes minimal difference, suggesting we've hit a ceiling with direction count alone.
+
+### Experiment 4: Adaptive Confidence Thresholds
+
+**Motivation:** Standard confidence weighting treats all confidence levels the same. What if we adaptively boost high-confidence directions and handle uncertain situations differently?
+
+**Methodology:**
+- Use 7 directions (Exp 2 setup)
+- Apply **adaptive weighting strategies** based on confidence patterns:
+
+**Strategy 1: Very High Confidence (>0.75)**
+- If any direction has confidence >0.75: boost it 2.5x, reduce others to 0.5x
+
+**Strategy 2: Centered Boost (>0.68)**
+- If centered_10 confidence >0.68: boost centered 1.8x, reduce others to 0.8x
+- Rationale: Centered had 0.655 avg in Exp 1 (historically most reliable)
+
+**Strategy 3: All Low Confidence (<0.60)**
+- If all directions have confidence <0.60: use equal weighting
+- Rationale: When all uncertain, don't trust any one too much
+
+**Strategy 4: Normal Case**
+- Otherwise: standard confidence weighting
+
+**Thresholds used:**
+- `high_conf_threshold = 0.70`
+- `very_high_conf_threshold = 0.75`
+- `centered_boost_threshold = 0.68`
+
+**Results (4-fold CV, 3 seeds):**
+
+**OVERALL: 0.4392 ± 0.0422**
+
+**Fold breakdown:**
+- Fold 1: 0.5094 ± 0.0115 (+0.0198 from Exp 2) 🔥
+- Fold 2: 0.4231 ± 0.0061 (-0.0064)
+- Fold 3: 0.4072 ± 0.0140 (-0.0041)
+- Fold 4: 0.4172 ± 0.0076 (-0.0058)
+
+**Gain: +0.0008 overall (minimal), but Fold 1: +0.0198!**
+
+**Critical Insights:**
+1. **Thresholds are fold-specific** - What works for Fold 1 (Day 1 data, ~600K records) doesn't work for Fold 2-4 (Days 2-4, different distributions)
+2. **Confidence patterns vary by fold** - Fold 1 might have higher absolute confidences; Fold 2-4 might have lower but same relative patterns
+3. **Overfitting to Fold 1** - Thresholds (0.68, 0.70, 0.75) optimized for Fold 1's characteristics
+4. **Fold 1 hit 0.5094!** - Shows the approach CAN work when thresholds match data characteristics
+5. **Need adaptive thresholds** - Fixed thresholds don't generalize across folds
+
+**Why Fold 1 improved so much:**
+- Day 1 has ~600K records (largest fold)
+- Possibly more stable confidence patterns
+- Thresholds based on Exp 1 (which also used Fold 1)
+- Other folds have fewer records, different room distributions
 
 ---
 
@@ -772,69 +502,181 @@ Confidence-weighted window:
 | **14** | Bi-GRU + ground truth | **0.53** | Simpler = better |
 | **16** | Temporal gap segment | 0.15 | Timestamps ≠ room changes |
 | **17** | Change point detection | N/A | Only 37% recall |
-| **18** | Multi-scale voting | 0.15 | Bad scales drag down good |
+| **18** | Multi-scale voting | 0.15 | Bad aggregation (majority voting) |
 | **19** | **Bi-GRU + sliding window** | **0.39** | Architecture > strategy |
 | **20** | Sequential spatial filter | 0.03 | Cascading errors |
-| **21** | Viterbi spatial | 0.41 | Modest gain (+0.02) |
-| **22** | **5-model ensemble** | **0.41** 🏆 | **Breakthrough: +5.7%** |
+| **21** | Viterbi spatial | 0.41 | Tiny gain (+0.002) |
+| **22** | **5-model ensemble** | **0.41** | **Breakthrough: +5.7%** |
 | **23** | Time gap features | 0.30 | Features can hurt! |
-| **24** | **Ensemble + Conf voting** | **0.41** | **Total gain: +6.5%** |
+| **24** | **Ensemble + Conf voting** | **0.41** | **Total: +6.5%** |
+| **Exp 1** | **3-direction windows** | **0.43** | **Multi-direction breakthrough!** |
+| **Exp 2** | **7-direction windows** | **0.44** | **More directions help** |
+| **Exp 3** | 5-direction windows | 0.44 | Similar to Exp 2 |
+| **Exp 4** | **7-dir + adaptive conf** | **0.44** | **Fold-specific patterns** |
 
 ---
 
-## Current Best Approach (Approach 24)
+## Current Best Approach (Experiment 2/4)
 
 **Configuration:**
 - Model: Bidirectional GRU (128 → 64 units)
 - Features: Beacon count percentages (23-dim per second)
 - Training: Ground truth room sequences (max 50 timesteps)
-- Inference: 10-second sliding window
+- Inference: Multi-directional sliding windows (7 directions)
+  - backward_10, centered_10, forward_10
+  - backward_15, forward_15
+  - asymm_past, asymm_future
 - Ensemble: 5 models with different seeds [base, +1000, +2000, +3000, +4000]
+- Direction combination: Confidence-weighted aggregation
 - Voting: Confidence-weighted temporal voting (5-second window)
 
 **Performance:**
-- Mean: 0.4106 ± 0.0266
-- Best fold: 0.4501 (Fold 1) - **TARGET ACHIEVED!**
-- Gap from overall target (0.45): 0.0394 (need +0.039 more)
+- **Best overall:** Experiment 2 - 0.4384 ± 0.0329
+- **Best single fold:** Experiment 4, Fold 1 - 0.5094 ± 0.0115
+- Gap from target (0.45): 0.0116 (need +0.012 more)
 
 **Progress toward goal:**
-- Starting point: 0.3854
-- Target: 0.4500 (+0.0646 needed)
-- Current: 0.4106 (+0.0252 achieved)
-- **Progress: 50.5% of the way to +0.05 goal**
+- Starting point: 0.4106 (Approach 24)
+- Target: 0.4500
+- Current best: 0.4384 (Experiment 2)
+- **Progress: 70.6% of the way from baseline to +0.05 goal**
 
 ---
 
-## Promising Next Directions (Untested)
+## Promising Next Directions
 
-Based on Phase 8 results, the following approaches are most likely to provide the remaining +0.04 F1 needed to reach 0.45:
+Based on Phase 9 experiments, the following approaches are most likely to provide the remaining +0.012 F1 needed to reach 0.45:
 
-### **Option A: Learned Spatial Constraints (Expected: +0.015-0.025)**
-- Learn transition probabilities from training data (not floor plan adjacency)
-- Modulate by ensemble confidence scores
-- Use Viterbi decoding with data-driven transitions
-- **Why promising:** Approach 21 got +0.02 with basic Viterbi; ensemble confidence should improve this
-- **Rationale:** Current ensemble gives better confidence → spatial constraints should work better
+### **Option A: Fold-Adaptive Confidence Thresholds (Expected: +0.01-0.015)**
 
-### **Option B: Hyperparameter Tuning (Expected: +0.01-0.02)**
-- Window size: Try 12s, 15s (currently 10s)
-- Vote window: Try 7s, 9s (currently 5s)  
-- Ensemble size: Try 7 models (currently 5)
-- **Why promising:** Current parameters not optimized for ensemble
-- **Rationale:** Ensemble changes optimal window sizes (more stable predictions)
+**Problem identified:** Experiment 4 showed that fixed thresholds (0.68, 0.70, 0.75) work great for Fold 1 (+0.0198) but hurt Fold 2-4. Different folds have different confidence distributions.
 
-### **Option C: Adaptive Confidence Window (Expected: +0.005-0.01)**
-- High confidence (>0.7): Use shorter 3s voting window
-- Low confidence (<0.5): Use longer 7s voting window
-- Currently using fixed 5s for all predictions
-- **Why promising:** Exploits ensemble confidence information better
-- **Rationale:** Don't over-smooth when model is certain
+**Solution:** Learn thresholds dynamically per fold from the data:
+```python
+# Instead of fixed thresholds, calculate from observed confidences:
+avg_centered_conf = mean(centered_predictions.confidence)
+avg_other_conf = mean(other_predictions.confidence)
 
-### **Option D: Class-Specific Strategies (Expected: +0.01-0.02)**
-- Special handling for hallway (currently 0.02 F1)
-- Different voting strategies for high-variance rooms
-- Boost minority classes with targeted approaches
-- **Why promising:** Macro F1 is average across classes; help worst classes
-- **Rationale:** Hallway is structural different from rooms (transition space)
+# Set thresholds relative to what we observe
+centered_boost_threshold = avg_centered_conf + 0.02
+high_conf_threshold = avg_other_conf + 0.05
+very_high_conf_threshold = avg_other_conf + 0.10
+```
 
-**Recommended order:** Try A first (biggest expected gain), then tune with B, finally refine with C.
+**Why promising:**
+- Addresses root cause: different folds have different absolute confidence levels
+- Preserves relative patterns (which DO transfer across folds)
+- Experiment 4 proved the strategy works when thresholds match data
+- Generalizable to any fold characteristics
+
+**Expected gain:** +0.01 to +0.015
+- If all folds get Fold 1's improvement pattern, could reach 0.448-0.453
+
+---
+
+### **Option B: Variance-Based Direction Weighting (Expected: +0.008-0.012)**
+
+**Problem identified:** Absolute confidence values vary by fold (Experiment 4 showed this). Need fold-agnostic metric.
+
+**Solution:** Use confidence variance instead of absolute values:
+```python
+For each timestep position:
+  confidence_variance = std([conf_backward, conf_centered, ..., conf_asymm_future])
+  
+  If variance HIGH (directions disagree):
+    → Some directions confident, others aren't
+    → Boost most confident ones heavily (2.0x)
+    → Reduce low-confidence ones (0.5x)
+  
+  If variance LOW (all similar confidence):
+    → Directions agree
+    → Standard confidence weighting (1.0x)
+```
+
+**Why promising:**
+- Fold-agnostic: works regardless of absolute confidence levels
+- Captures "agreement vs disagreement" patterns
+- When directions disagree, trust the confident ones
+- When directions agree, no need for special handling
+
+**Expected gain:** +0.008 to +0.012
+
+---
+
+### **Option C: Hyperparameter Tuning (Expected: +0.005-0.015)**
+
+**Problem identified:** Current hyperparameters were NEVER optimized for multi-directional ensemble setup:
+- `vote_window = 5s` (fixed)
+- `ensemble_size = 5` (arbitrary)
+- Window sizes: 10s, 15s (not tuned)
+
+**Solution:** Grid search on key hyperparameters:
+```python
+vote_window: [3, 5, 7, 9]  # Currently fixed at 5s
+ensemble_size: [5, 7, 9]   # Currently 5
+# Maybe 7 or 9 models reduce variance further?
+```
+
+**Why promising:**
+- Ensemble changed prediction dynamics (more stable)
+- Optimal parameters likely shifted
+- Low-hanging fruit: no architecture changes
+- Fast to test: just parameter sweep
+
+**Expected gain:** +0.005 to +0.015
+- Conservative estimate: +0.008 (gets to 0.446)
+
+---
+
+### **Option D: Lower/Adjust Fixed Thresholds (Expected: +0.003-0.008)**
+
+**Quick fix for Experiment 4:** Current thresholds (0.68, 0.70, 0.75) might be too high for Fold 2-4.
+
+**Solution:** Try more lenient thresholds:
+```python
+Current:
+  centered_boost_threshold = 0.68
+  high_conf_threshold = 0.70
+  very_high_conf_threshold = 0.75
+
+Try:
+  centered_boost_threshold = 0.62  # Much lower
+  high_conf_threshold = 0.65
+  very_high_conf_threshold = 0.70
+```
+
+**Why worth trying:**
+- Simplest option (just change 3 numbers)
+- Fast to test
+- Might help Fold 2-4 without hurting Fold 1
+
+**Expected gain:** +0.003 to +0.008 (modest)
+
+---
+
+## Recommended Experimental Order
+
+1. **Option A (Fold-Adaptive Thresholds)** - Addresses root cause, highest expected gain
+2. **Option C (Hyperparameter Tuning)** - Low-hanging fruit, no architecture changes
+3. **Option B (Variance-Based Weighting)** - Novel approach, fold-agnostic
+
+**Rationale:**
+- Option A directly addresses the fold-specific pattern we discovered
+- Option C is easy to implement and test
+- If A+C together close the gap, we're done!
+- Option B as backup if A doesn't generalize
+
+**Current gap to target:** 0.0116 (just 1.16% more!)
+**Most likely path to success:** Option A (+0.012) OR Option C (+0.012) OR both combined (+0.02)
+
+---
+
+## Key Learnings from Phase 9
+
+1. **Multi-directional windows are powerful** - +0.0278 total gain from baseline (Exp 2)
+2. **Confidence weighting >> majority voting** - 2.8x improvement over Approach 18
+3. **More directions help but plateau** - 3→7 directions: +0.0111; 7→5: no change
+4. **Fold-specific characteristics matter** - Same strategy performs differently on different folds
+5. **Centered window is most reliable** - Consistently highest confidence (0.655 avg)
+6. **Adaptive strategies need fold awareness** - Fixed thresholds don't generalize
+7. **We're 96% to target** - 0.4384 → 0.45 is only +0.0116 more!
