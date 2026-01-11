@@ -460,11 +460,6 @@ Action: Override t with Kitchen (majority + higher confidence around it)
 - Better than accuracy (which can be misleading with class imbalance)
 - Appropriate for multiclass problems with imbalanced distributions
 
-**Reporting strategy**:
-- **Traditional ML**: Single run per fold (deterministic methods)
-- **Deep Learning (during development)**: Multiple random seeds per fold → report mean ± std
-- **Final approach**: Ensemble already includes 5 seeds → single evaluation per fold sufficient
-
 ---
 
 ## **4. Results**
@@ -578,27 +573,6 @@ Action: Override t with Kitchen (majority + higher confidence around it)
 | + Multi-directional windows (7) | [XX] | [+XX] | Robust inference |
 | + Model ensemble (5 seeds) | [XX] | [+XX] | Variance reduction |
 | + Temporal smoothing | **[XX]** | [+XX] | Spatial consistency |
-
-**Key insights from ablation**:
-1. **Largest single gain**: Sequential modeling (Bi-GRU) provides approximately [+XX] improvement
-   - Validates core hypothesis about importance of temporal patterns
-   - Single most important architectural decision
-   
-2. **Multi-directional windows critical**: Approximately [+XX] gain
-   - Solves the deployment challenge (bridging train-test gap)
-   - Essential for real-world application
-   
-3. **Model ensemble provides stability**: Approximately [+XX] gain
-   - Reduces variance, increases reliability
-   - Important for production deployment confidence
-   
-4. **Every component contributes**: All additions provide measurable benefit
-   - Cumulative effect → approximately [XX]% total improvement
-   - No redundant components
-
-**Statistical significance**: 
-- p-value < 0.001 vs. traditional ML baseline (highly significant)
-- 95% confidence interval: [[XX], [XX]]
 
 ---
 
@@ -727,39 +701,3 @@ While achieving strong performance, opportunities remain:
 - Transfer learning across different facilities
 
 This work establishes a strong foundation for practical sequential deep learning approaches in indoor localization systems.
-
----
-
-## **KEY STRUCTURAL NOTES**
-
-### **Paper Flow Logic**:
-1. **Intro**: Problem → Traditional fails → Our solution succeeds
-2. **Dataset**: What we have → How we prepared it
-3. **Methodology**: How traditional works → How our approach works (with detailed "why" for each component)
-4. **Results**: Traditional numbers → Our numbers → Comparison
-5. **Discussion**: Why it works → Broader implications
-6. **Conclusion**: Summary → Impact → Future
-
-### **Figures/Tables Checklist**:
-- Figure 1: Traditional ML pipeline visualization
-- Figure 2: Our complete pipeline visualization
-- Table 1/Figure 3: Sample label data
-- Table 2/Figure 4: Sample BLE data
-- Figure 5: Traditional ML flowchart (detailed)
-- Figure 6: Our method flowchart (detailed, 4 phases)
-- Figure 7: RSSI vs. Frequency distribution comparison
-- Figure 8: Model architecture diagram (Bi-GRU + Attention)
-- Figure 9: Sequence length distribution (justifies window sizes)
-- Tables 3-7: Results tables (traditional, ours, per-class, comparison, ablation)
-
-### **Writing Style Notes**:
-- Keep technical but accessible
-- Use examples to illustrate concepts (e.g., Kitchen→Room517 teleportation)
-- Justify every design choice with clear reasoning
-- Balance detail with readability
-- Emphasize practical applicability alongside theoretical contribution
-
-### **No Numbers Rule**:
-- This outline uses [XX] placeholders throughout
-- Fill in actual numbers during writing based on your experimental results
-- Keep percentages, scores, and counts as placeholders for now
