@@ -154,13 +154,11 @@ The attention layer learns which timesteps within a sequence are most informativ
 \FloatBarrier
 \paragraph{Training with Sequential Learning}
 During training, we segment data into sequences using ground truth room labels. We identify consecutive timestamps where the room label remains constant through:
-\begin{equation}
-\begin{split}
+\begin{multline}
 \text{room\_group\_id} = \\
 \text{cumulative\_sum}(\text{room\_label} \neq \text{previous\_room\_label})
-\end{split}
 \label{eq:grouping}
-\end{equation}
+\end{multline}
 where each contiguous block of the same room becomes one training sequence. For example, a 45-second stay in the kitchen creates one sequence of 45 timesteps. Sequences shorter than 3 timesteps are discarded, while sequences longer than 50 timesteps are truncated by taking the last 50 timesteps. The model is trained using sparse categorical cross-entropy loss with balanced class weights, where each training sequence represents one complete room visit.
 
 \paragraph{Multi-Level Ensemble Inference}
