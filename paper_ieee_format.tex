@@ -11,6 +11,7 @@
 \usepackage{float}
 \usepackage{placeins}
 \usepackage{breqn}
+\usepackage{array}
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -88,6 +89,7 @@ The final preprocessed dataset contains approximately 1.1 million labeled sample
 \caption{Final Preprocessed Dataset Structure}
 \label{tab:dataset}
 \centering
+\renewcommand{\arraystretch}{1.5}
 \begin{tabular}{|c|c|c|c|}
 \hline
 \textbf{timestamp} & \textbf{mac\_address} & \textbf{RSSI} & \textbf{room} \\
@@ -175,9 +177,9 @@ For robust predictions, we train 5 independent models with different random init
 \FOR{each direction $d \in \{\text{backward\_10},$ $\text{centered\_10}, \text{forward\_10},$ $\text{backward\_15}, \text{forward\_15},$ $\text{asymm\_past}, \text{asymm\_future}\}$}
     \STATE Extract sequences from direction $d$
     \FOR{each model $i$ ($i = 1$ to $5$)}
-        \STATE $\text{probability}_i = \text{model}_i.\text{predict}(\text{sequences}_d)$
+        \STATE $\text{prob}_i = \text{model}_i.\text{predict}(\text{sequences}_d)$
     \ENDFOR
-    \STATE $\text{averaged\_probability}_d = \text{mean}(\text{probability}_1, \ldots, \text{probability}_5)$
+    \STATE $\text{averaged\_probability}_d = \text{mean}(\text{prob}_1, \ldots, \text{prob}_5)$
 \ENDFOR
 \end{algorithmic}
 \end{algorithm}
@@ -254,7 +256,8 @@ The four folds exhibit substantial variation in data size and class distribution
 \caption{Cross-Validation Fold Characteristics}
 \label{tab:folds}
 \centering
-\small
+\resizebox{\columnwidth}{!}{%
+\renewcommand{\arraystretch}{1.5}
 \begin{tabular}{|c|c|c|c|c|c|c|}
 \hline
 \textbf{Fold} & \textbf{Test} & \textbf{Train} & \textbf{Test} & \textbf{Ratio} & \textbf{Train} & \textbf{Test} \\
@@ -268,7 +271,8 @@ The four folds exhibit substantial variation in data size and class distribution
 \hline
 4 & Day 1 & 465,004 & 590,447 & 0.79× & 12 & 12 \\
 \hline
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 Fold 1 tests on the smallest dataset (Day 4 with 30,619 frames), providing the largest training set and a highly favorable train/test ratio of 31.4×. Conversely, Fold 4 presents the most challenging scenario: testing on the largest dataset (Day 1 with 590,447 frames) while training on the smallest subset (465,004 frames), resulting in a train/test ratio below 1 (0.79×). This tests the model's ability to generalize when training data is scarce relative to deployment scale. The number of room classes also varies across folds, ranging from 12 to 18 unique locations, reflecting realistic deployment conditions where different days may involve visits to different subsets of rooms.
@@ -283,6 +287,7 @@ Table~\ref{tab:results} presents the comprehensive evaluation results comparing 
 \label{tab:results}
 \centering
 \resizebox{\columnwidth}{!}{%
+\renewcommand{\arraystretch}{1.5}
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
 \textbf{Approach} & \textbf{F1} & \textbf{F2} & \textbf{F3} & \textbf{F4} & \textbf{Mean±Std} \\
