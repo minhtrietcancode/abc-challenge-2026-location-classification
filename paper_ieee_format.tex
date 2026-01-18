@@ -175,11 +175,9 @@ For robust predictions, we train 5 independent models with different random init
 \FOR{each direction $d \in \{\text{backward\_10},$ $\text{centered\_10}, \text{forward\_10},$ $\text{backward\_15}, \text{forward\_15},$ $\text{asymm\_past}, \text{asymm\_future}\}$}
     \STATE Extract sequences from direction $d$
     \FOR{each model $i$ ($i = 1$ to $5$)}
-        \STATE $\text{probability}_i =$ 
-        \STATE \hspace{1em} $\text{model}_i.\text{predict}(\text{sequences}_d)$
+        \STATE $\text{probability}_i = \text{model}_i.\text{predict}(\text{sequences}_d)$
     \ENDFOR
-    \STATE $\text{averaged\_probability}_d =$ 
-    \STATE \hspace{1em} $\text{mean}(\text{probability}_1, \ldots, \text{probability}_5)$
+    \STATE $\text{averaged\_probability}_d = \text{mean}(\text{probability}_1, \ldots, \text{probability}_5)$
 \ENDFOR
 \end{algorithmic}
 \end{algorithm}
@@ -210,17 +208,11 @@ The second level aggregates the 7 direction-specific probability distributions u
 \begin{algorithmic}[1]
 \FOR{timestamp $t$ with 7 directional probability distributions}
     \FOR{each direction $d$ ($d = 1$ to $7$)}
-        \STATE $\text{confidence}_d =$ 
-        \STATE \hspace{1em} $\max(\text{probability\_distribution}_d)$
-        \STATE $\text{weighted\_vote}_d =$ 
-        \STATE \hspace{1em} $\text{probability\_distribution}_d \times$
-        \STATE \hspace{1em} $\text{confidence}_d$
+        \STATE $\text{confidence}_d = \max(\text{probability\_distribution}_d)$
+        \STATE $\text{weighted\_vote}_d = \text{probability\_distribution}_d \times \text{confidence}_d$
     \ENDFOR
-    \STATE $\text{final\_probability}_t =$ 
-    \STATE \hspace{1em} $\sum(\text{weighted\_vote}_d) /$
-    \STATE \hspace{1em} $\sum(\text{confidence}_d)$
-    \STATE $\text{final\_prediction}_t =$ 
-    \STATE \hspace{1em} $\arg\max(\text{final\_probability}_t)$
+    \STATE $\text{final\_probability}_t = \sum(\text{weighted\_vote}_d) / \sum(\text{confidence}_d)$
+    \STATE $\text{final\_prediction}_t = \arg\max(\text{final\_probability}_t)$
 \ENDFOR
 \end{algorithmic}
 \end{algorithm}
@@ -234,14 +226,10 @@ For each prediction at timestamp $t$, we examine a 5-second temporal window $[t-
 \label{alg:smoothing}
 \begin{algorithmic}[1]
 \FOR{each timestamp $j \in [t-2, t-1, t, t+1, t+2]$}
-    \STATE $\text{confidence}_j =$ 
-    \STATE \hspace{1em} $\max(\text{probability\_distribution}_j)$
-    \STATE $\text{weighted\_vote} \mathrel{+}=$ 
-    \STATE \hspace{1em} $\text{probability\_distribution}_j \times$
-    \STATE \hspace{1em} $\text{confidence}_j$
+    \STATE $\text{confidence}_j = \max(\text{probability\_distribution}_j)$
+    \STATE $\text{weighted\_vote} \mathrel{+}= \text{probability\_distribution}_j \times \text{confidence}_j$
 \ENDFOR
-\STATE $\text{smoothed\_prediction}_t =$ 
-\STATE \hspace{1em} $\arg\max(\sum \text{weighted\_vote})$
+\STATE $\text{smoothed\_prediction}_t = \arg\max(\sum \text{weighted\_vote})$
 \end{algorithmic}
 \end{algorithm}
 
