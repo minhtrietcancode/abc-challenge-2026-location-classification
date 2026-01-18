@@ -16,16 +16,24 @@
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+
 \begin{document}
 
 \title{Deep Attention-based Sequential Ensemble Learning for BLE-Based Indoor Localization in Care Facilities}
 
 \author{
-\IEEEauthorblockN{Author Name\textsuperscript{1}, Author Name\textsuperscript{2}, Author Name\textsuperscript{3}}
-\IEEEauthorblockA{\textsuperscript{1,2,3}\textit{Department Name} \\
-\textit{Institution Name}\\
-City, Country \\
-email@domain.com}
+\IEEEauthorblockN{Minh Triet Pham\textsuperscript{1}, Quynh Chi Dang\textsuperscript{1}, Le Nhat Tan\textsuperscript{2}}
+\IEEEauthorblockA{\textsuperscript{1}\textit{School of Computing and Information Systems} \\
+\textit{The University of Melbourne}\\
+Melbourne, Victoria, Australia \\
+minhtrietp@student.unimelb.edu.au, quynhchid@student.unimelb.edu.au}
+\IEEEauthorblockA{\textsuperscript{2}\textit{Faculty of Applied Science} \\
+\textit{Ho Chi Minh City University of Technology (HCMUT), VNU-HCM}\\
+Ho Chi Minh City, Vietnam \\
+lenhattan@hcmut.edu.vn}
 }
 
 \maketitle
@@ -135,7 +143,6 @@ Starting from preprocessed data, we construct 25-dimensional beacon vectors for 
 \end{equation}
 where $\text{count}_{i,t}$ is the number of times beacon $i$ was detected and $\text{total\_detections}_t$ is the total number of all beacon detections in that window. For undetected beacons, frequency is 0. We use 23 beacons (beacons 1-23) in practice as beacons 24-25 were never detected. Each 1-second window is represented by a 23-dimensional frequency vector with values normalized between 0 and 1.
 
-\FloatBarrier
 \paragraph{Model Architecture}
 The model consists of a masking layer to handle variable-length sequences with padding to 50 timesteps, followed by a first Bidirectional GRU layer with 128 units that processes sequences in both forward and backward directions to capture temporal dependencies from both past context (origin) and future context (destination). A dropout layer (0.3 rate) provides regularization, followed by a second Bidirectional GRU layer with 64 units for secondary temporal abstraction creating more stable representations. After another dropout layer (0.3 rate), an attention mechanism computes attention scores, applies softmax to obtain attention weights, and creates a weighted context vector:
 \begin{align}
@@ -153,7 +160,6 @@ The attention layer learns which timesteps within a sequence are most informativ
 \label{fig:architecture}
 \end{figure}
 
-\FloatBarrier
 \paragraph{Training with Sequential Learning}
 During training, we segment data into sequences using ground truth room labels. We identify consecutive timestamps where the room label remains constant through:
 \begin{multline}
@@ -177,7 +183,7 @@ For robust predictions, we train 5 independent models with different random init
 \FOR{each direction $d \in \{\text{backward\_10},$ $\text{centered\_10}, \text{forward\_10},$ $\text{backward\_15}, \text{forward\_15},$ $\text{asymm\_past}, \text{asymm\_future}\}$}
     \STATE Extract sequences from direction $d$
     \FOR{each model $i$ ($i = 1$ to $5$)}
-        \STATE $\text{prob}_i = \text{model}_i.\text{predict}(\text{sequences}_d)$
+        \STATE $\text{probability}_i = \text{model}_i.\text{predict}(\text{sequences}_d)$
     \ENDFOR
     \STATE $\text{averaged\_probability}_d = \text{mean}(\text{prob}_1, \ldots, \text{prob}_5)$
 \ENDFOR
@@ -186,7 +192,6 @@ For robust predictions, we train 5 independent models with different random init
 
 This produces 7 probability distributions (one per direction), where each distribution represents the ensemble consensus of 5 models for that particular temporal perspective.
 
-\FloatBarrier
 \textit{Level 2: Multi-Directional Window Combination (Across Directions)}
 
 The second level aggregates the 7 direction-specific probability distributions using confidence-weighted voting.
@@ -219,7 +224,6 @@ The second level aggregates the 7 direction-specific probability distributions u
 \end{algorithmic}
 \end{algorithm}
 
-\FloatBarrier
 \paragraph{Temporal Smoothing}
 For each prediction at timestamp $t$, we examine a 5-second temporal window $[t-2, t-1, t, t+1, t+2]$ and apply confidence-weighted voting:
 
