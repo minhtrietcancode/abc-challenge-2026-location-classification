@@ -282,8 +282,7 @@ Table~\ref{tab:results} presents the comprehensive evaluation results comparing 
 \caption{Macro F1 Scores Across 4-Fold Cross-Validation (F1-F4: Fold 1-4; Var.: Variation)}
 \label{tab:results}
 \centering
-\scriptsize
-\setlength{\tabcolsep}{2pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
 \textbf{Approach} & \textbf{F1} & \textbf{F2} & \textbf{F3} & \textbf{F4} & \textbf{Mean±Std} \\
@@ -296,7 +295,8 @@ Var. 2 & 0.2830 & 0.2486 & 0.2633 & 0.3455 & 0.2851±0.0369 \\
 \hline
 \textbf{DASEL} & \textbf{0.5114} & \textbf{0.4207} & \textbf{0.4340} & \textbf{0.4082} & \textbf{0.4438±0.0295} \\
 \hline
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 The traditional machine learning approaches demonstrate limited and remarkably consistent performance. The baseline method achieved a mean macro F1 score of 0.2805 ± 0.0278. Variation 1 with dominant beacon features achieved the highest traditional ML performance at 0.2898 ± 0.0293, while Variation 2 with signal pattern-based relabeling yielded 0.2851 ± 0.0369. Despite targeting different optimization strategies - feature engineering in Variation 1 versus data augmentation in Variation 2 - all traditional methods remained within a narrow 0.2805 to 0.2898 range. This consistent plateau across fundamentally different techniques suggests these methods have reached a fundamental ceiling imposed by the independence assumption paradigm.
