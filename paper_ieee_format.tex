@@ -137,7 +137,7 @@ To establish a comprehensive baseline, we explored optimizations from different 
 \FloatBarrier
 \subsubsection{Deep Attention-based Sequential Ensemble Learning (DASEL)}
 \label{subsec:dasel}
-DASEL reconceptualizes indoor localization as a sequential learning problem through four integrated phases: frequency-based feature engineering, sequential model training, multi-level ensemble inference, and temporal smoothing. Fig.~\ref{fig:daselworkflow} provides an overview of the complete DASEL workflow.
+DASEL reconceptualizes indoor localization as a sequential learning problem through four integrated phases: (1) frequency-based feature engineering, (2) sequential model training using bidirectional recurrent networks with attention mechanisms, (3) multi-level ensemble inference combining multiple temporal perspectives and model initializations, and (4) temporal smoothing for spatial consistency. Fig.~\ref{fig:daselworkflow} provides an overview of the complete DASEL workflow.
 
 \begin{figure}[!htbp]
 \centering
@@ -146,23 +146,30 @@ DASEL reconceptualizes indoor localization as a sequential learning problem thro
 \label{fig:daselworkflow}
 \end{figure}
 
-\paragraph{Frequency-Based Feature Engineering}
-Starting from preprocessed data, we construct 25-dimensional beacon vectors for each record and group readings by timestamp into 1-second windows. Within each window, we calculate beacon appearance frequency as:
+\paragraph{Phase 1: Frequency-Based Feature Engineering}
+Starting from preprocessed data (Section 2.2), we transform raw RSSI measurements into frequency-based representations. For each BLE detection record, we construct a 25-dimensional beacon vector where position $i$ contains the RSSI value if beacon $i$ was detected, and 0 otherwise. BLE readings sharing the same timestamp are grouped into 1-second windows \cite{b6}, \cite{b7}. Within each window, we calculate beacon appearance frequency as:
 \begin{equation}
 \text{frequency}_{i,t} = \frac{\text{count}_{i,t}}{\text{total\_detections}_t}
 \label{eq:frequency}
 \end{equation}
-where $\text{count}_{i,t}$ is the number of times beacon $i$ was detected and $\text{total\_detections}_t$ is the total number of all beacon detections in that window. For undetected beacons, frequency is 0. We use 23 beacons (beacons 1-23) in practice as beacons 24-25 were never detected. Each 1-second window is represented by a 23-dimensional frequency vector with values normalized between 0 and 1.
+where $\text{count}_{i,t}$ is the number of times beacon $i$ was detected in window $t$, and $\text{total\_detections}_t$ is the total number of all beacon detections in that window. For undetected beacons, frequency is 0. We use 23 beacons (beacons 1-23) as beacons 24-25 were never detected. Each window is represented by a 23-dimensional frequency vector with values normalized between 0 and 1.
 
-\paragraph{Model Architecture}
-The model consists of a masking layer to handle variable-length sequences with padding to 50 timesteps, followed by a first Bidirectional GRU layer with 128 units that processes sequences in both forward and backward directions to capture temporal dependencies from both past context (origin) and future context (destination). A dropout layer (0.3 rate) provides regularization, followed by a second Bidirectional GRU layer with 64 units for secondary temporal abstraction creating more stable representations. After another dropout layer (0.3 rate), an attention mechanism computes attention scores, applies softmax to obtain attention weights, and creates a weighted context vector:
+\paragraph{Phase 2: Sequential Model Training}
+During training, we segment data into sequences using ground truth room labels. We identify consecutive timestamps where the room label remains constant:
+\begin{multline}
+\text{room\_group\_id} = \\
+\text{cumulative\_sum}(\text{room\_label} \neq \text{previous\_room\_label})
+\label{eq:grouping}
+\end{multline}
+Each contiguous block of the same room becomes one training sequence. Sequences shorter than 3 timesteps are discarded; sequences longer than 50 timesteps are truncated by taking the last 50 timesteps.
+
+The model architecture (Fig.~\ref{fig:architecture}) consists of: masking layer (handles variable-length sequences, padding to 50 timesteps); first Bidirectional GRU layer (128 units); dropout (0.3); second Bidirectional GRU layer (64 units); dropout (0.3); attention mechanism with:
 \begin{align}
 \text{attention\_scores} &= \tanh(W \cdot \text{sequence} + b) \label{eq:attn1} \\
 \text{attention\_weights} &= \text{softmax}(\text{attention\_scores}) \label{eq:attn2} \\
 \text{context\_vector} &= \sum(\text{sequence} \times \text{attention\_weights}) \label{eq:attn3}
 \end{align}
-
-The attention layer learns which timesteps within a sequence are most informative, emphasizing high-confidence moments while downweighting noisy transitions. A dense layer (32 units with ReLU activation and 0.2 dropout) provides final feature transformation, and the output layer uses softmax activation to produce probability distributions over all room classes. Fig.~\ref{fig:architecture} illustrates the complete model architecture.
+dense layer (32 units, ReLU, 0.2 dropout); and output layer (softmax activation). The model is trained using sparse categorical cross-entropy loss with balanced class weights.
 
 \begin{figure}[!htbp]
 \centering
@@ -171,21 +178,10 @@ The attention layer learns which timesteps within a sequence are most informativ
 \label{fig:architecture}
 \end{figure}
 
-\paragraph{Training with Sequential Learning}
-During training, we segment data into sequences using ground truth room labels. We identify consecutive timestamps where the room label remains constant through:
-\begin{multline}
-\text{room\_group\_id} = \\
-\text{cumulative\_sum}(\text{room\_label} \neq \text{previous\_room\_label})
-\label{eq:grouping}
-\end{multline}
-where each contiguous block of the same room becomes one training sequence. For example, a 45-second stay in the kitchen creates one sequence of 45 timesteps. Sequences shorter than 3 timesteps are discarded, while sequences longer than 50 timesteps are truncated by taking the last 50 timesteps. The model is trained using sparse categorical cross-entropy loss with balanced class weights, where each training sequence represents one complete room visit.
+\paragraph{Phase 3: Multi-Level Ensemble Inference}
+Phase 3 implements a two-level ensemble strategy combining multi-seed model training with multi-directional sliding windows.
 
-\paragraph{Multi-Level Ensemble Inference}
-The inference phase implements a two-level ensemble strategy that combines multi-seed model training with multi-directional sliding windows.
-
-\textit{Level 1: Multi-Seed Model Ensemble (Within Each Direction)}
-
-For robust predictions, we train 5 independent models with different random initialization seeds: [42, 1042, 2042, 3042, 4042]. Large increments (+1000) ensure sufficient diversity in initial weight configurations. For each of the 7 directional windows, we apply probability averaging across the 5 models:
+\textit{Level 1: Multi-Seed Model Ensemble.} We train 5 independent models with different random initialization seeds [42, 1042, 2042, 3042, 4042]. For each of the 7 directional windows, we apply probability averaging across the 5 models (Algorithm~\ref{alg:multiseed}), producing 7 probability distributions.
 
 \begin{algorithm}[!htbp]
 \caption{Multi-Seed Model Ensemble}
@@ -201,24 +197,17 @@ For robust predictions, we train 5 independent models with different random init
 \end{algorithmic}
 \end{algorithm}
 
-This produces 7 probability distributions (one per direction), where each distribution represents the ensemble consensus of 5 models for that particular temporal perspective.
-
-\textit{Level 2: Multi-Directional Window Combination (Across Directions)}
-
-The second level aggregates the 7 direction-specific probability distributions using confidence-weighted voting.
-
-\textit{Multi-Directional Sliding Windows:} For each timestamp $t$ requiring prediction, we create 7 different temporal windows:
+\textit{Level 2: Multi-Directional Window Combination.} For each timestamp $t$ requiring prediction, we create 7 temporal windows:
 \begin{itemize}
-\item backward\_10: $[t-9, \ldots, t]$ - 10 seconds of history
-\item centered\_10: $[t-4, \ldots, t, \ldots, t+5]$ - 10 seconds centered on $t$
-\item forward\_10: $[t, \ldots, t+9]$ - 10 seconds looking forward
-\item backward\_15: $[t-14, \ldots, t]$ - 15 seconds of history (extended context)
-\item forward\_15: $[t, \ldots, t+14]$ - 15 seconds looking forward (early transition detection)
-\item asymm\_past: $[t-11, \ldots, t, \ldots, t+3]$ - Past-biased (12s past + 4s future)
-\item asymm\_future: $[t-3, \ldots, t, \ldots, t+11]$ - Future-biased (4s past + 12s future)
+\item backward\_10: $[t-9, \ldots, t]$
+\item centered\_10: $[t-4, \ldots, t+5]$
+\item forward\_10: $[t, \ldots, t+9]$
+\item backward\_15: $[t-14, \ldots, t]$
+\item forward\_15: $[t, \ldots, t+14]$
+\item asymm\_past: $[t-11, \ldots, t+3]$
+\item asymm\_future: $[t-3, \ldots, t+11]$
 \end{itemize}
-
-\textit{Confidence-Weighted Aggregation:} Each directional window produces a probability distribution with an associated confidence score (the maximum probability value). We aggregate these 7 distributions using confidence-weighted voting:
+Each directional window produces a probability distribution with confidence score (maximum probability). We aggregate using confidence-weighted voting (Algorithm~\ref{alg:confweight}).
 
 \begin{algorithm}[!htbp]
 \caption{Confidence-Weighted Aggregation}
@@ -235,8 +224,8 @@ The second level aggregates the 7 direction-specific probability distributions u
 \end{algorithmic}
 \end{algorithm}
 
-\paragraph{Temporal Smoothing}
-For each prediction at timestamp $t$, we examine a 5-second temporal window $[t-2, t-1, t, t+1, t+2]$ and apply confidence-weighted voting:
+\paragraph{Phase 4: Temporal Smoothing}
+For each prediction at timestamp $t$, we examine a 5-second temporal window $[t-2, t-1, t, t+1, t+2]$ and apply confidence-weighted voting (Algorithm~\ref{alg:smoothing}, Fig.~\ref{fig:smoothing}).
 
 \begin{algorithm}[!htbp]
 \caption{Temporal Smoothing}
@@ -249,8 +238,6 @@ For each prediction at timestamp $t$, we examine a 5-second temporal window $[t-
 \STATE $\text{smoothed\_prediction}_t = \arg\max(\sum \text{weighted\_vote})$
 \end{algorithmic}
 \end{algorithm}
-
-This post-processing enforces spatial consistency by eliminating isolated prediction errors that are physically implausible. Fig.~\ref{fig:smoothing} visualizes the 5-second smoothing process.
 
 \begin{figure}[!htbp]
 \centering
