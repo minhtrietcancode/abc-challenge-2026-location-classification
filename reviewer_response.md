@@ -12,7 +12,7 @@
 We have updated the Abstract to explicitly mention that this work is part of the ABC 2026 Activity and Location Recognition Challenge.
 
 **Location of change:**
-- **Abstract** (page 1): Added "developed as part of the ABC 2026 Activity and Location Recognition Challenge" in the second sentence.
+- **Abstract**: Added "developed as part of the ABC 2026 Activity and Location Recognition Challenge" in the second sentence.
 
 **Revised text:**
 > "To address this limitation, this paper, developed as part of the ABC 2026 Activity and Location Recognition Challenge, introduces Deep Attention-based Sequential Ensemble Learning (DASEL)..."
@@ -29,20 +29,20 @@ We have added all three requested challenge paper citations to the bibliography 
 
 **Location of changes:**
 
-1. **Bibliography** (page 13-14): Added three new references:
+1. **Bibliography**: Added three new references:
    - **[b20]**: Garcia et al. 2024 IJABC paper (relabeling approach)
    - **[b21]**: Garcia & Inoue 2024 Sensors paper (relabeling for indoor localization)
    - **[b26]**: Garcia et al. 2026 "Decoding the Invisible" challenge summary paper
 
-2. **Figure 1 caption** (Section 2.1, page 3): Added citation to source of floor map
+2. **Figure 1 caption**: Added citation to source of floor map
    - Changed from: "5th floor map with beacon positions and room layout."
    - Changed to: "5th floor map with beacon positions and room layout \cite{b20, b26}."
 
-3. **Dataset section** (Section 2.1, page 3): Added citation to challenge summary
+3. **Dataset section**: Added citation to challenge summary
    - Changed from: "\cite{b18}"
    - Changed to: "\cite{b18, b26}"
 
-4. **Traditional ML section** (Section 2.3.1, page 5): Updated citation for Garcia relabeling method
+4. **Traditional ML section**: Updated citation for Garcia relabeling method
    - Changed from: "\cite{b20}"
    - Changed to: "\cite{b20, b21}"
 
@@ -58,9 +58,9 @@ We have added all three requested challenge paper citations to the bibliography 
 We have added this citation as requested.
 
 **Location of changes:**
-- **Bibliography** (page 14): Added as reference [b26]
-- **Dataset section** (Section 2.1, page 3): Cited alongside [b18]
-- **Figure 1 caption** (Section 2.1, page 3): Cited alongside [b20] as source of floor map
+- **Bibliography**: Added as reference [b26]
+- **Dataset section**: Cited alongside [b18]
+- **Figure 1 caption**: Cited alongside [b20] as source of floor map
 
 ---
 
@@ -70,16 +70,6 @@ We have added this citation as requested.
 **Response:**
 We have improved the contrast and resolution of all requested figures. Specifically:
 
-**Figures updated:**
-- **Figure 2** (Class distribution): Enhanced contrast, enlarged axes labels and legend
-- **Figure 3** (Traditional ML workflow): Increased resolution, improved text readability
-- **Figure 4** (DASEL workflow): Enhanced contrast, enlarged component labels
-- **Figure 5** (DASEL model architecture): Improved layer labels and connection clarity
-- **Figure 7** (RSSI distribution comparison): Enlarged axes, enhanced legend readability
-- **Figure 8** (Frequency distribution): Improved contrast, enlarged axes labels
-
-All figure axes, legends, and annotations are now clearly readable at publication resolution.
-
 ---
 
 ### Comment 5: Proofreading
@@ -87,10 +77,6 @@ All figure axes, legends, and annotations are now clearly readable at publicatio
 
 **Response:**
 We have carefully proofread the entire manuscript and corrected grammatical errors. Major improvements include:
-- Clarified complex sentences in the Introduction and Discussion sections
-- Fixed subject-verb agreement issues
-- Improved clarity of technical descriptions in the Methodology section
-- Enhanced readability of the Results and Analysis section
 
 ---
 
@@ -103,7 +89,7 @@ We have carefully proofread the entire manuscript and corrected grammatical erro
 We have completely restructured the final two paragraphs of the Introduction section to explicitly present our research objectives, improved aspects, and evaluation targets in a clear, numbered format.
 
 **Location of change:**
-- **Introduction section** (Section 1, page 2): Rewrote the last two paragraphs
+- **Introduction section**: Rewrote the last two paragraphs
 
 **New structure includes:**
 
@@ -152,20 +138,20 @@ We have substantially revised the Discussion section paragraph on bidirectional 
 ## SUMMARY OF REVISIONS
 
 ### Citations and References:
-- ✅ Added 3 new references (Garcia et al. papers)
-- ✅ Updated Figure 1 caption to cite floor map source
-- ✅ Updated all affected in-text citations (renumbered b21-b25 → b22-b27)
-- ✅ All 27 references verified for correct sequential numbering and citation usage
+- Added 3 new references (Garcia et al. papers)
+- Updated Figure 1 caption to cite floor map source
+- Updated all affected in-text citations (renumbered b21-b25 → b22-b27)
+- All 27 references verified for correct sequential numbering and citation usage
 
 ### Content Improvements:
-- ✅ Abstract explicitly mentions ABC 2026 Challenge participation
-- ✅ Introduction restructured with explicit numbered research objectives
-- ✅ Discussion enhanced to link attention mechanism → data characteristics → performance
-- ✅ Manuscript proofread for grammatical errors and clarity
+- Abstract explicitly mentions ABC 2026 Challenge participation
+- Introduction restructured with explicit numbered research objectives
+- Discussion enhanced to link attention mechanism → data characteristics → performance
+- Manuscript proofread for grammatical errors and clarity
 
 ### Figure Quality:
-- ✅ Enhanced contrast and resolution for Figures 2, 3, 4, 5, 7, and 8
-- ✅ Enlarged axes labels and legends for readability
-- ✅ All figures now meet publication quality standards
+- Enhanced contrast and resolution for Figures 2, 3, 4, 5, 7, and 8
+- Enlarged axes labels and legends for readability
+- All figures now meet publication quality standards
 
-We believe these revisions have fully addressed all reviewer concerns and substantially improved the manuscript's clarity and completeness. We thank the reviewers for their valuable feedback.
+We believe these revisions have fully addressed all reviewer concerns and substantially improved the manuscript's clarity and completeness. We appreciate the reviewers for their valuable feedback.
