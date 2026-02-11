@@ -91,7 +91,7 @@ The complete dataset spans four consecutive days (April 10-13, 2023) and covers 
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\columnwidth]{class distribution all dataset fixed.jpg}
+\includegraphics[width=\columnwidth]{room_counts_barh.png}
 \caption{Overall class distribution across all four days.}
 \label{fig:classdist}
 \end{figure}
@@ -141,7 +141,7 @@ The traditional baseline approach treats each temporal window as an independent 
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\columnwidth]{traditional ml flow fixed.jpg}
+\includegraphics[width=\columnwidth]{traditional_ml_flow.png}
 \caption{Traditional machine learning workflow.}
 \label{fig:tradml}
 \end{figure}
@@ -155,7 +155,7 @@ DASEL reconceptualizes indoor localization as a sequential learning problem thro
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\columnwidth]{dasel workflow fixed.jpg}
+\includegraphics[width=\columnwidth]{dasel_full_workflow.png}
 \caption{DASEL complete workflow.}
 \label{fig:daselworkflow}
 \end{figure}
@@ -187,7 +187,7 @@ dense layer (32 units, ReLU, 0.2 dropout); and output layer (softmax activation)
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\columnwidth]{dasel model fixed.jpg}
+\includegraphics[width=\columnwidth]{dasel_model_arc.jpg}
 \caption{DASEL model architecture.}
 \label{fig:architecture}
 \end{figure}
@@ -336,7 +336,7 @@ Frequency-based features provide critical practical advantages for real-world de
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\columnwidth]{rssi distribution comparison fixed.jpg}
+\includegraphics[width=\columnwidth]{rssi_boxplot_kitchen_cafeteria_vertical.png}
 \caption{RSSI distribution comparison between Kitchen and Cafeteria showing high variance and overlap.}
 \label{fig:rssicomp}
 \end{figure}
@@ -345,7 +345,7 @@ In contrast, beacon appearance frequency captures which beacons are detected rat
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\columnwidth]{frequency distribution comparisons fixed.jpg}
+\includegraphics[width=\columnwidth]{beacon_freq_distribution.png}
 \caption{Beacon frequency distribution for Kitchen, Cafeteria, and Cleaning showing distinct patterns.}
 \label{fig:freqdist}
 \end{figure}
@@ -358,7 +358,7 @@ The choice of window sizes (10 and 15 seconds) is empirically grounded in the tr
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\columnwidth]{sequence length distributions fixed.jpg}
+\includegraphics[width=\columnwidth]{sequence_length_histogram.png}
 \caption{Training sequence length distribution showing concentration between 10-200 seconds.}
 \label{fig:seqdist}
 \end{figure}
